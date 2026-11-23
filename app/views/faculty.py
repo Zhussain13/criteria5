@@ -6,7 +6,7 @@ import io
 import json
 import re
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import (Blueprint, Response, abort, current_app, flash, g, redirect, render_template, request,
@@ -17,6 +17,8 @@ from ..db import get_db
 from ..faculty_proofs import KINDS, check_proof, institute_aliases, proof_status, recheck_faculty
 from ..roster import YEARS, Roster
 from ..years import AssessmentYears
+from .. import activity
+from ..erp import NotConnected, compare, connector
 from .auth import login_required, program_access
 
 bp = Blueprint("faculty", __name__, url_prefix="/programs/<int:program_id>/faculty")
@@ -80,7 +82,7 @@ def parse_date(s) -> str | None:
 
 
 def parse_bool(v, default=0) -> int:
-    t = str(v or "").strip().lower()
+    t = ("" if v is None else str(v)).strip().lower()
     if not t:
         return default
     return 1 if t in ("1", "yes", "y", "true", "full time", "full-time", "ft", "allied") else 0
@@ -113,14 +115,16 @@ def clean_row(raw: dict, program) -> dict:
     return r
 
 
-def save_row(db, program_id: int, r: dict, fid: int | None = None) -> int:
-    cols = FIELDS
+def save_row(db, program_id: int, r: dict, fid: int | None = None, source: str = "manual") -> int:
+    cols = FIELDS + ["source", "updated_by", "updated_at"]
+    uid = g.user["id"] if g.get("user") else None
+    vals = [r[c] for c in FIELDS] + [source, uid, datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")]
     if fid:
         db.execute("UPDATE faculty SET " + ", ".join(f"{c} = ?" for c in cols) + " WHERE id = ? AND program_id = ?",
-                   (*[r[c] for c in cols], fid, program_id))
+                   (*vals, fid, program_id))
         return fid
     return db.execute("INSERT INTO faculty (program_id, " + ", ".join(cols) + ") VALUES (?, " +
-                      ", ".join("?" * len(cols)) + ")", (program_id, *[r[c] for c in cols])).lastrowid
+                      ", ".join("?" * len(cols)) + ")", (program_id, *vals)).lastrowid
 
 
 def read_sheet(upload) -> list[dict]:
@@ -168,9 +172,13 @@ def list_faculty(program_id):
     if show == "issues":
         faculty = [f for f in faculty if st.get(f["id"], {}).get("appointment") != "verified"
                    or (f["qualification"] in ("Ph.D.",) and st.get(f["id"], {}).get("degree") != "verified")]
+    con = connector()
+    last_erp = db.execute("SELECT a.created_at, a.detail, u.name FROM activity a LEFT JOIN users u ON u.id = a.user_id "
+                          "WHERE a.program_id = ? AND a.action = 'Imported from ERP' ORDER BY a.id DESC LIMIT 1",
+                          (program_id,)).fetchone()
     return render_template("faculty/list.html", p=p, acc=acc, faculty=faculty, pres=pres, st=st, counts=counts,
                            years=[{"name": y, "label": years.label(y)} for y in YEARS], can_edit=_can_edit(acc),
-                           show=show)
+                           show=show, erp=con.status() if con else None, last_erp=last_erp)
 
 
 @bp.route("/new", methods=("GET", "POST"))
@@ -199,6 +207,7 @@ def edit(program_id, fid=None):
                                    designations=DESIGNATIONS, degrees=DEGREES)
         new_id = save_row(db, program_id, r, fid)
         recheck_faculty(db, p, new_id)
+        activity.log(db, program_id, "Edited faculty" if fid else "Added faculty", r["name"])
         db.commit()
         flash("Saved. The Criterion 5 numbers are counted again from the list.", "ok")
         return redirect(url_for("faculty.detail", program_id=program_id, fid=new_id))
@@ -219,9 +228,13 @@ def detail(program_id, fid):
     years = AssessmentYears(p["cay_start_year"], p["ay_start_month"])
     pres = Roster([f], years).presence_table()[0]
     files = db.execute("SELECT * FROM faculty_proofs WHERE faculty_id = ? ORDER BY kind, id", (fid,)).fetchall()
-    files = [{**dict(x), "checks": json.loads(x["checks_json"] or "[]")} for x in files]
+    files = [{**dict(x), "checks": json.loads(x["checks_json"] or "[]"),
+              "by": (db.execute("SELECT name FROM users WHERE id = ?", (x["uploaded_by"],)).fetchone() or {"name": ""})["name"]
+              if x["uploaded_by"] else ""} for x in files]
+    updated_by = db.execute("SELECT name FROM users WHERE id = ?", (f["updated_by"],)).fetchone() if f["updated_by"] else None
     st = proof_status(db, program_id).get(fid, {})
     return render_template("faculty/detail.html", p=p, acc=acc, f=f, pres=pres, files=files, st=st, kinds=KINDS,
+                           updated_by=updated_by["name"] if updated_by else "",
                            years=[{"name": y, "label": years.label(y)} for y in YEARS], can_edit=_can_edit(acc))
 
 
@@ -232,6 +245,9 @@ def delete(program_id, fid):
     if not _can_edit(acc):
         abort(403)
     db = get_db()
+    row = db.execute("SELECT name FROM faculty WHERE id = ? AND program_id = ?", (fid, program_id)).fetchone()
+    if row:
+        activity.log(db, program_id, "Removed faculty", row["name"])
     db.execute("DELETE FROM faculty WHERE id = ? AND program_id = ?", (fid, program_id))
     db.commit()
     flash("Removed from the faculty list.", "ok")
@@ -281,6 +297,8 @@ def upload(program_id, fid):
         res = store_proof(db, p, f, kind, up.filename, up.read(), g.user["id"])
         n += 1
         bad += res["status"] != "verified"
+        activity.log(db, program_id, "Uploaded proof",
+                     f"{KINDS[kind]} of {f['name']}: " + ("checked" if res["status"] == "verified" else "does not match"))
     db.commit()
     if n:
         flash(f"{n} file(s) read and checked." + (f" {bad} need attention: see the reasons below." if bad else " All good."),
@@ -307,6 +325,7 @@ def delete_proof(program_id, fid, proof_id):
     if not _can_edit(acc):
         abort(403)
     db = get_db()
+    activity.log(db, program_id, "Removed proof", f"from faculty #{fid}")
     db.execute("DELETE FROM faculty_proofs WHERE id = ? AND faculty_id IN (SELECT id FROM faculty WHERE id = ? AND "
                "program_id = ?)", (proof_id, fid, program_id))
     db.commit()
@@ -344,14 +363,15 @@ def import_list(program_id):
             continue
         fid = existing.get(P.normalise_name(r["name"]))
         if fid and replace:
-            save_row(db, program_id, r, fid)
+            save_row(db, program_id, r, fid, source="file")
             recheck_faculty(db, p, fid)
             updated += 1
         elif fid:
             continue
         else:
-            existing[P.normalise_name(r["name"])] = save_row(db, program_id, r)
+            existing[P.normalise_name(r["name"])] = save_row(db, program_id, r, source="file")
             added += 1
+    activity.log(db, program_id, "Imported faculty file", f"{up.filename}: {added} added, {updated} updated")
     db.commit()
     for e in errors[:10]:
         flash(e, "error")
@@ -387,4 +407,72 @@ def recheck_all(program_id):
         recheck_faculty(db, acc["program"], f["id"])
     db.commit()
     flash("All proofs checked again.", "ok")
+    return redirect(url_for("faculty.list_faculty", program_id=program_id))
+
+
+# ------------------------------------------------------------------ ERP link
+
+@bp.route("/erp")
+@login_required
+def erp_preview(program_id):
+    """Read the ERP and show what would change, before anything is saved."""
+    acc = program_access(program_id)
+    if not _can_edit(acc):
+        abort(403)
+    p = acc["program"]
+    con = connector()
+    if con is None:
+        abort(404)
+    status = con.status()
+    diff, students, error = None, {}, ""
+    try:
+        diff = compare(get_db(), p, con.faculty(p))
+        students = con.students(p)
+    except NotConnected as e:
+        error = str(e)
+    db = get_db()
+    typed = {(r["key"], r["year"]): r["value"] for r in db.execute(
+        "SELECT key, year, value FROM metrics WHERE program_id = ? AND key IN ('S', 'DS')", (program_id,))}
+    years = AssessmentYears(p["cay_start_year"], p["ay_start_month"])
+    stu_rows = [{"key": k, "year": y, "label": years.label(y), "erp": v, "now": typed.get((k, y))}
+                for (k, y), v in sorted(students.items())]
+    return render_template("faculty/erp.html", p=p, acc=acc, status=status, diff=diff, students=stu_rows, error=error)
+
+
+@bp.route("/erp", methods=("POST",))
+@login_required
+def erp_import(program_id):
+    """Copy the ERP data into the SAR tables: new faculty, changed details, student strength."""
+    acc = program_access(program_id)
+    if not _can_edit(acc):
+        abort(403)
+    p = acc["program"]
+    con = connector()
+    if con is None:
+        abort(404)
+    db = get_db()
+    try:
+        diff = compare(db, p, con.faculty(p))
+        students = con.students(p)
+    except NotConnected as e:
+        flash(str(e), "error")
+        return redirect(url_for("faculty.erp_preview", program_id=program_id))
+    for r in diff["new"]:
+        save_row(db, program_id, r, source="erp")
+    for ch in diff["changed"]:
+        save_row(db, program_id, ch["row"], ch["id"], source="erp")
+        recheck_faculty(db, p, ch["id"])
+    n_stu = 0
+    if request.form.get("students"):
+        for (k, y), v in students.items():
+            db.execute("INSERT INTO metrics (program_id, key, year, value, updated_by) VALUES (?, ?, ?, ?, ?) "
+                       "ON CONFLICT(program_id, key, year) DO UPDATE SET value = excluded.value, "
+                       "updated_by = excluded.updated_by, updated_at = datetime('now')",
+                       (program_id, k, y, v, g.user["id"]))
+            n_stu += 1
+    msg = (f"{len(diff['new'])} new faculty, {len(diff['changed'])} updated"
+           + (f", {n_stu} student numbers" if n_stu else ""))
+    activity.log(db, program_id, "Imported from ERP", msg)
+    db.commit()
+    flash(f"Imported from the ERP: {msg}. The Criterion 5 numbers and SAR tables are updated.", "ok")
     return redirect(url_for("faculty.list_faculty", program_id=program_id))

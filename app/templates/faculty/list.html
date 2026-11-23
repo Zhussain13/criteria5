@@ -20,11 +20,23 @@
     <div class="k">appointment letters checked</div></div>
 </div>
 
+{% if erp %}
+<div class="card" style="border-left:5px solid {{ 'var(--ok)' if erp.connected else 'var(--warn)' }};display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+  <div style="font-size:30px">🔗</div>
+  <div style="flex:1;min-width:240px">
+    <b>ERP link (Juno Campus)</b> <span class="pill {{ 'ok' if erp.connected else 'warn' }}">{{ erp.label }}</span>
+    <div class="small muted" style="margin-top:4px">One click reads the faculty records and student strength from the ERP and fills them into
+      the Criterion 5 SAR tables. You see every change before it is saved.{% if last_erp %} Last import: {{ last_erp.created_at[:16] }} UTC by {{ last_erp.name }} ({{ last_erp.detail }}).{% endif %}</div>
+  </div>
+  {% if can_edit %}<a class="btn accent lg" href="{{ url_for('faculty.erp_preview', program_id=p.id) }}">⬇ Import from ERP</a>{% endif %}
+</div>
+{% endif %}
+
 {% if can_edit %}
 <div class="cols" style="margin-bottom:14px">
   <form method="post" action="{{ url_for('faculty.import_list', program_id=p.id) }}" enctype="multipart/form-data" class="card flat" style="margin:0">
     <input type="hidden" name="_csrf" value="{{ csrf_token }}">
-    <b>Import the list from the ERP or Excel</b>
+    <b>Or upload an Excel / CSV file</b>
     <p class="small muted" style="margin:4px 0 10px">An Excel/CSV export from the ERP (Juno Campus) or a sheet in the NBA Table B2.A
       format. Column names are matched automatically. <a href="{{ url_for('faculty.template', program_id=p.id) }}">Download the template</a>.</p>
     <label class="small"><input type="checkbox" name="mode" value="replace" style="width:auto"> Update people already in the list</label>
@@ -56,7 +68,7 @@
   <tr>
     <td><a href="{{ url_for('faculty.detail', program_id=p.id, fid=f.id) }}"><b>{{ f.name }}</b></a>
       {% if f.is_hod %}<span class="pill blue">HoD</span>{% endif %}
-      <div class="small muted">{{ f.nature }}{% if not f.full_time %} · part-time{% endif %}{% if f.first_year %} · 100% first year{% endif %}</div></td>
+      <div class="small muted">{% if f.source == 'erp' %}<span class="pill blue" title="Read from the ERP">ERP</span> {% endif %}{{ f.nature }}{% if not f.full_time %} · part-time{% endif %}{% if f.first_year %} · 100% first year{% endif %}</div></td>
     <td class="small">{{ f.department or p.department }}{% if f.allied %} <span class="pill grey">allied</span>{% endif %}</td>
     <td class="small">{{ f.designation }}{% if f.designated_on %}<div class="muted">since {{ f.designated_on }}</div>{% endif %}</td>
     <td>{% if f.qualification %}<span class="pill {{ 'ok' if f.qualification == 'Ph.D.' else 'grey' }}">{{ f.qualification }}</span>{% endif %}

@@ -163,7 +163,7 @@ def seed(app) -> dict:
         rng = random.Random(5)
         rows = _faculty_rows(rng)
         prog = db.execute("SELECT * FROM programs WHERE id = ?", (pid,)).fetchone()
-        ids = [save_row(db, pid, r) for r in rows]
+        ids = [save_row(db, pid, r, source="erp") for r in rows]   # as if read from the ERP last month
         faculty = {f["id"]: f for f in db.execute("SELECT * FROM faculty WHERE program_id = ?", (pid,))}
 
         # proofs: most correct, a few wrong on purpose (what a peer team would catch)
@@ -211,6 +211,17 @@ def seed(app) -> dict:
                 _pdf([INSTITUTE, "Student strength (UG + PG), Department of CSE and allied departments", "",
                       "2025-26: 2160 (Department alone 1200)", "2024-25: 2040 (Department alone 1140)",
                       "2023-24: 1920 (Department alone 1080)"]))
+        # what the team did so far (shown to the head, HoD and principal under "Recent updates")
+        for when, who, action, detail in [
+            ("-20 days", "member", "Imported from ERP", f"{len(ids)} new faculty, 0 updated, 6 student numbers"),
+            ("-18 days", "member", "Uploaded proof", "appointment letters and degree certificates of the department"),
+            ("-16 days", "head", "Uploaded proof", "appointment letters and degree certificates of the allied departments"),
+            ("-12 days", "head", "Added to 5.4", "Visiting / adjunct faculty (Table 5.4.1)"),
+            ("-11 days", "member", "Added to 5.1", "Student strength, Department + allied"),
+            ("-10 days", "hod", "Updated numbers", "pre-qualifier facts on the Criterion 5 data sheet"),
+        ]:
+            db.execute("INSERT INTO activity (program_id, user_id, action, detail, created_at) VALUES "
+                       "(?, ?, ?, ?, datetime('now', ?))", (pid, users[who], action, detail, when))
         db.commit()
         from .views.audit import _audit_and_save
 

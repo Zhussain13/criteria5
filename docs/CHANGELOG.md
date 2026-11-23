@@ -1,5 +1,17 @@
 # Changelog
 
+## 23 Nov 2026 — ERP link and shared updates
+
+- **Import from ERP** button on the faculty list and the Numbers page: reads the faculty records and student
+  strength from the ERP and fills the Criterion 5 SAR tables. A preview shows new faculty, changed details
+  (e.g. promotion, leaving date) and student numbers before anything is saved. Demo connection with sample data
+  for now (`ERP_MODE=demo`); `database` mode waits for read-only access from CMRIT IT.
+- **Recent updates**: every change (ERP import, faculty added or edited, proof uploaded, numbers, entries, audit)
+  is logged with who and when, and shown to the criteria head, HoD (dashboard) and principal (home page).
+- Faculty records show their source (ERP / file / typed) and who changed them last; proofs show who uploaded them.
+- Fix: a "0" in an imported sheet (e.g. part-time) was read as empty.
+- 26 tests.
+
 ## 23 Nov 2026 — first version (Criterion 5 pilot)
 
 The committee asked for one criterion working end to end before the full project. Criterion 5 was picked because

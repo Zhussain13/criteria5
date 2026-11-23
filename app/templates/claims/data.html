@@ -7,6 +7,7 @@
   <div><div class="eyebrow">Data sheet · Criterion {{ criterion }}</div><h1>{{ crit.name }}</h1>
     <p class="sub" style="margin:4px 0 0">Blue rows are counted by the app from the <a href="{{ url_for('faculty.list_faculty', program_id=p.id) }}">faculty list</a>.
       You only type the student numbers (S, DS, from the ERP admissions data) and the pre-qualifier facts.</p></div>
+  {% if config.ERP_MODE != 'off' and can_edit %}<a class="btn accent" href="{{ url_for('faculty.erp_preview', program_id=p.id) }}">⬇ Read student strength from ERP</a>{% endif %}
   <div class="stat" style="min-width:170px;padding:12px 16px"><div class="v" id="filledCount">0</div><div class="k">of <span id="totalCount">0</span> numbers entered</div></div>
 </div>
 <div class="card flat small" style="background:var(--primary-soft);border-color:#cfdcff">

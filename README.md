@@ -13,12 +13,13 @@ Same design, same logins and roles as CMRSARathi, cut down to Criterion 5 and bu
 
 | Step | What the app does |
 |---|---|
-| 1. Faculty list (NBA Table B2.A) | Import an Excel/CSV export from the ERP (Juno Campus) or add people one by one. Column names are matched automatically. Department and allied departments together. |
+| 1. Faculty list (NBA Table B2.A) | **Import from ERP**: one click reads the faculty records and student strength from the ERP (Juno Campus) and fills them into the Criterion 5 SAR tables; the member sees every new person and every changed detail before it is saved. Or upload an Excel/CSV export, or add people one by one. Department and allied departments together. |
 | 2. Counting | For CAY, CAYm1 and CAYm2 it counts F, PoP, FF, Ph.D., M.Tech, Professors / Associate / Assistant Professors, retention bands A-E, the HoD and Professor conditions. Promotions and Ph.D. award dates are respected year by year. Nobody counts by hand. |
 | 3. Numbers | Only the student strength (S, DS, from the ERP admissions data) and three pre-qualifier facts are typed in. Visiting-faculty hours are added up from SAR Table 5.4.1. |
 | 4. Proof check | Each person's appointment letter and degree certificate (PDF or phone photo) is read with free OCR (pdfplumber / Tesseract) and checked: name, institute, joining date, designation, degree, university, duplicate files. Every failed check says why. |
 | 5. Audit | Marks for 5.1-5.5 with the working (NBA formulas, tested against NBA's own worked examples), grade Y/C/W/D, the marks **if the peer team accepts only checked proofs**, the faculty whose proofs to fix, NBA pre-visit qualifiers, faculty conditions for 3-year / 6-year accreditation, fix list and likely peer-team questions. |
-| 6. Word files | Audit report (.docx) and the Criterion 5 SAR draft (.docx) with the data tables, Table B2.A, the proof list and the evidence index. |
+| 6. One shared record | What a criteria member adds (ERP import, faculty, proofs, numbers) is saved in one place, so the criteria head, HoD and principal see it at once. "Recent updates" on the dashboard (and the principal's home page) shows who did what and when; each faculty record shows its source (ERP / file / typed) and who changed it last. |
+| 7. Word files | Audit report (.docx) and the Criterion 5 SAR draft (.docx) with the data tables, Table B2.A, the proof list and the evidence index. |
 
 ### Formulas (NBA SAR format, Tier I, April 2026)
 
@@ -33,6 +34,19 @@ Same design, same logins and roles as CMRSARathi, cut down to Criterion 5 and bu
 Counting rules the IQAC should confirm (constants in `app/roster.py`): a person counts in a year if on the rolls for at
 least 6 months of it; designation and degree are taken as on 1 January of the year; PoP counted up to 20% of required
 faculty (NBA Annexure-I).
+
+## ERP link
+
+`ERP_MODE` (environment variable):
+
+| Mode | What it does |
+|---|---|
+| `demo` (default) | Demo connection with sample data shaped like a Juno Campus export: 2 new joinees, 1 person who left, 1 promotion since the last import. Clearly labelled as sample data on screen. |
+| `database` | Read-only connection to the ERP database (`ERP_DB_URL`). Needs a read-only account and the table structure from CMRIT IT; until the tables are mapped it says "not connected". |
+| `off` | No ERP button. |
+
+All modes return the same record shape as the faculty list, so the comparison, the import and the proof re-checks
+are the same (`app/erp.py`).
 
 ## Roles
 
@@ -64,7 +78,7 @@ someone else's letter, a copied file, an M.Tech certificate for a Ph.D.) so the 
 pip install -r requirements.txt        # Tesseract binary needed only for scanned proofs / photos
 flask --app run seed-demo              # demo data
 python run.py                          # http://127.0.0.1:5000
-python -m pytest -q                    # 24 tests, all must pass
+python -m pytest -q                    # 26 tests, all must pass
 ```
 
 Or: `start.bat` (Windows), `./start.sh` (Mac/Linux), GitHub Codespaces (`.devcontainer`), or Render
@@ -78,6 +92,8 @@ there is no Tesseract, so only text PDFs are read; on the CMRIT server install T
 | ![Sign in](docs/screenshots/1_sign_in.png) | ![Dashboard](docs/screenshots/2_dashboard.png) |
 | ![Faculty list](docs/screenshots/3_faculty_list.png) | ![Numbers](docs/screenshots/4_numbers.png) |
 | ![Audit report](docs/screenshots/5_audit_report.png) | ![Proof check](docs/screenshots/6_proof_check.png) |
+| ![ERP link](docs/screenshots/7_erp_link.png) | ![Import from ERP](docs/screenshots/8_erp_import.png) |
+| ![Principal: recent updates](docs/screenshots/9_principal_updates.png) | |
 
 ## Code map
 
@@ -85,6 +101,8 @@ there is no Tesseract, so only text PDFs are read; on the CMRIT server install T
 app/rules/criterion5_tier1_2026.yaml  marks, formulas, data fields (auto: roster = counted from the faculty list)
 app/roster.py          faculty list -> year-wise Criterion 5 numbers (and the "only checked proofs" count)
 app/faculty_proofs.py  appointment letter / degree certificate checks, proof status, faculty issues
+app/erp.py             ERP link (demo / database / off) and the "what would change" comparison
+app/activity.py        who did what (Recent updates for the head, HoD and principal)
 app/c5audit.py         the audit: engine + strict re-score + proofs + pre-qualifiers + award conditions
 app/engine.py          NBA scorers (shared with CMRSARathi)
 app/views/faculty.py   faculty list pages, ERP/Excel import, proof upload
@@ -94,8 +112,8 @@ docs/nba/              the official NBA PDFs used for the rules
 
 ## Not done yet (honest list)
 
-- Direct connection to the Juno Campus ERP database: today the list comes in as an Excel/CSV export (read-only DB access
-  from CMRIT IT is the next step).
+- The ERP button runs on a demo connection (sample data). The real Juno Campus link needs a read-only database account
+  and the table structure from CMRIT IT; the code path (`DatabaseERP` in `app/erp.py`) is ready to be filled in.
 - Counting rules marked above to be confirmed with the IQAC.
 - Criteria 1-4 and 6-9 live in the main CMRSARathi app.
 

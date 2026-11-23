@@ -41,3 +41,39 @@ def test_demo(app):
     assert c.get("/").status_code == 200
     owner = login(app, "owner@cmrsarathi.local", platform=True)
     assert owner.get("/platform/").status_code == 200
+
+
+def test_erp_import_by_member_is_seen_by_head_hod_principal(app):
+    seed(app)
+    member = login(app, "member@cmrit.local")
+    page = member.get("/programs/1/faculty/").get_data(as_text=True)
+    assert "Import from ERP" in page and "Demo ERP connection" in page
+    preview = member.get("/programs/1/faculty/erp").get_data(as_text=True)
+    assert "CSE Faculty 065" in preview and "DS Faculty 031" in preview      # new joinees in the ERP
+    assert "AIML Faculty 005" in preview                                     # left: leaving date changed
+    tok = re.search(r'name="_csrf" value="([^"]+)"', preview).group(1)
+    r = member.post("/programs/1/faculty/erp", data={"_csrf": tok, "students": "1"}, follow_redirects=True)
+    assert "Imported from the ERP: 2 new faculty, 2 updated" in r.get_data(as_text=True)
+    with app.app_context():
+        db = get_db()
+        f = db.execute("SELECT source, leaving_date FROM faculty WHERE name = 'AIML Faculty 005'").fetchone()
+        assert f["source"] == "erp" and f["leaving_date"]
+        assert db.execute("SELECT COUNT(*) FROM faculty WHERE name IN ('CSE Faculty 065', 'DS Faculty 031')").fetchone()[0] == 2
+    # a second look finds nothing new
+    again = member.get("/programs/1/faculty/erp").get_data(as_text=True)
+    assert "Import 0 faculty changes" in again
+    # the member's work is visible to the criteria head, the HoD and the principal
+    for email in ("head@cmrit.local", "hod@cmrit.local", "principal@cmrit.local"):
+        c = login(app, email)
+        dash = c.get("/programs/1").get_data(as_text=True)
+        assert "Imported from ERP" in dash and "Criteria member - Criterion 5" in dash, email
+        assert "CSE Faculty 065" in c.get("/programs/1/faculty/").get_data(as_text=True), email
+    assert "Recent updates" in login(app, "principal@cmrit.local").get("/").get_data(as_text=True)
+
+
+def test_erp_off(app):
+    app.config["ERP_MODE"] = "off"
+    seed(app)
+    c = login(app, "hod@cmrit.local")
+    assert "Import from ERP" not in c.get("/programs/1/faculty/").get_data(as_text=True)
+    assert c.get("/programs/1/faculty/erp").status_code == 404

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_feed.html" import feed %}
 {% block title %}{{ p.name }}{% endblock %}
 {% block content %}
 {% set pct = (100 * last.awarded / last.maximum)|round|int if last and last.maximum else 0 %}
@@ -80,6 +81,11 @@
     </table>
   </div>
 </div>
+
+<h2 id="updates">Recent updates by the team</h2>
+<p class="small muted" style="margin-top:-6px">Everything a criteria member adds is saved in the same place, so the criteria head, HoD and principal
+  see it at once. This list shows who did what.</p>
+{{ feed(updates) }}
 
 <h2 id="team">Team</h2>
 <p class="small muted" style="margin-top:-6px">The principal sees every program automatically. HoDs, criteria heads and criteria members are added here.</p>

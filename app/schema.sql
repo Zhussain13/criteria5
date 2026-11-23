@@ -69,7 +69,20 @@ CREATE TABLE IF NOT EXISTS faculty (
     teaching_areas TEXT NOT NULL DEFAULT '',
     research_areas TEXT NOT NULL DEFAULT '',
     publications INTEGER,
-    profile_url TEXT NOT NULL DEFAULT ''
+    profile_url TEXT NOT NULL DEFAULT '',
+    source       TEXT NOT NULL DEFAULT 'manual', -- manual / file / erp
+    updated_by   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    updated_at   TEXT
+);
+
+-- Who changed what (shown to the criteria head, HoD and principal on the dashboard).
+CREATE TABLE IF NOT EXISTS activity (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    program_id  INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+    user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    action      TEXT NOT NULL,
+    detail      TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- Proof files behind the faculty list (appointment letter, degree certificate, promotion letter).

@@ -25,6 +25,7 @@
       <tr><th>Specialization</th><td>{{ f.specialization or '–' }}</td></tr>
       <tr><th>First-year load</th><td>{{ '100% first year (counted in FF)' if f.first_year else 'No' }}</td></tr>
       {% if f.apaar_id %}<tr><th>APAAR ID</th><td>{{ f.apaar_id }}</td></tr>{% endif %}
+      <tr><th>Source</th><td>{{ {'erp': 'Read from the ERP', 'file': 'Excel/CSV import', 'manual': 'Typed in'}.get(f.source, f.source) }}{% if f.updated_at %} · last change {{ f.updated_at }} UTC{% if updated_by %} by {{ updated_by }}{% endif %}{% endif %}</td></tr>
     </table>
   </div>
   <div class="card">
@@ -56,7 +57,7 @@
     {% for x in mine %}
     <div class="entry" style="align-items:flex-start">
       <div class="who"><a href="{{ url_for('faculty.view_proof', program_id=p.id, fid=f.id, proof_id=x.id) }}" target="_blank"><b>📎 {{ x.original_name }}</b></a>
-        <div class="small muted">uploaded {{ x.created_at[:16] }}</div>
+        <div class="small muted">uploaded {{ x.created_at[:16] }} UTC{% if x.by %} by {{ x.by }}{% endif %}</div>
         <ul class="small" style="margin:6px 0 0;padding-left:18px">
           {% for c in x.checks %}<li style="color:{{ 'var(--ok)' if c.ok else ('var(--bad)' if c.ok == false else 'var(--muted)') }}">{{ '✓' if c.ok else ('✗' if c.ok == false else '•') }} {{ c.text }}</li>{% endfor %}
         </ul></div>

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Import from ERP{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('programs.detail', program_id=p.id) }}">{{ p.name }}</a> ›
+  <a href="{{ url_for('faculty.list_faculty', program_id=p.id) }}">Faculty list</a> › Import from ERP</div>
+<div class="page-head">
+  <div><div class="eyebrow">ERP link · Juno Campus</div>
+    <h1>Import from the ERP</h1>
+    <p class="sub" style="margin:4px 0 0">The ERP has been read. Check what will change, then import: the faculty list (Table B2.A)
+      and the student strength are filled in the Criterion 5 SAR tables, and every number is counted again.</p></div>
+  <span class="pill {{ 'ok' if status.connected else 'warn' }}" style="font-size:13px">🔗 {{ status.label }}</span>
+</div>
+{% if status.mode == 'demo' %}<div class="card flat small" style="background:var(--warn-soft);border-color:#f3d9a6">
+  <b>Demo connection:</b> {{ status.detail }}</div>{% endif %}
+
+{% if error %}
+<div class="card"><b>Not connected</b><p class="small muted" style="margin:6px 0 0">{{ error }}</p></div>
+{% else %}
+<div class="stats">
+  <div class="stat"><div class="v" style="color:var(--ok)">{{ diff.new|length }}</div><div class="k">new faculty in the ERP</div></div>
+  <div class="stat"><div class="v" style="color:var(--warn)">{{ diff.changed|length }}</div><div class="k">faculty with changed details</div></div>
+  <div class="stat"><div class="v">{{ diff.same }}</div><div class="k">already up to date</div></div>
+  <div class="stat"><div class="v">{{ diff.missing|length }}</div><div class="k">in the SAR list but not in the ERP</div></div>
+</div>
+
+<form method="post">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  {% if diff.new %}
+  <h2>New faculty ({{ diff.new|length }})</h2>
+  <div class="table-wrap"><table class="small">
+    <tr><th>Name</th><th>Department</th><th>Designation</th><th>Highest degree</th><th>Date of joining</th><th>Nature</th></tr>
+    {% for r in diff.new %}<tr><td><b>{{ r.name }}</b></td><td>{{ r.department }}{% if r.allied %} <span class="pill grey">allied</span>{% endif %}</td>
+      <td>{{ r.designation }}</td><td>{{ r.qualification }}</td><td>{{ r.joining_date }}</td><td>{{ r.nature }}</td></tr>{% endfor %}
+  </table></div>
+  {% endif %}
+  {% if diff.changed %}
+  <h2>Changed in the ERP ({{ diff.changed|length }})</h2>
+  <div class="table-wrap"><table class="small">
+    <tr><th>Name</th><th>What changed</th></tr>
+    {% for c in diff.changed %}<tr><td><b>{{ c.row.name }}</b></td>
+      <td>{% for d in c.diffs %}<div>{{ d.field }}: <span class="muted" style="text-decoration:line-through">{{ d.old }}</span> → <b>{{ d.new }}</b></div>{% endfor %}</td></tr>{% endfor %}
+  </table></div>
+  {% endif %}
+  {% if students %}
+  <h2>Student strength (for 5.1 and 5.5)</h2>
+  <div class="table-wrap"><table class="small">
+    <tr><th>Number</th><th>Year</th><th>In the ERP</th><th>In the SAR now</th></tr>
+    {% for s in students %}<tr><td><b>{{ s.key }}</b> {{ 'students, Department + allied' if s.key == 'S' else 'students, Department alone' }}</td>
+      <td>{{ s.year }} ({{ s.label }})</td><td><b>{{ '%g' % s.erp }}</b></td>
+      <td>{% if s.now is none %}<span class="muted">empty</span>{% elif s.now != s.erp %}<span style="color:var(--warn)">{{ '%g' % s.now }}</span>{% else %}{{ '%g' % s.now }}{% endif %}</td></tr>{% endfor %}
+  </table></div>
+  <label class="small" style="margin-top:8px"><input type="checkbox" name="students" value="1" checked style="width:auto"> Also copy the student strength into the Numbers page</label>
+  {% endif %}
+  {% if diff.missing %}
+  <p class="small muted">{{ diff.missing|length }} people in the SAR list are not in the ERP ({{ diff.missing[:5]|map(attribute='name')|join(', ') }}{{ '…' if diff.missing|length > 5 }}). They are left as they are.</p>
+  {% endif %}
+  {% if diff.errors %}<div class="flash error">{{ diff.errors|length }} ERP records could not be read: {{ diff.errors[:3]|join('; ') }}</div>{% endif %}
+  <div class="form-actions">
+    <button class="accent lg" data-busy="Importing…">⬇ Import {{ diff.new|length + diff.changed|length }} faculty changes{{ ' and student strength' if students }}</button>
+    <a class="btn ghost" href="{{ url_for('faculty.list_faculty', program_id=p.id) }}">Cancel</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

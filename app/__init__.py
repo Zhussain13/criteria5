@@ -20,7 +20,10 @@ def create_app(test_config: dict | None = None) -> Flask:
         ALLOWED_EXTENSIONS={"pdf", "png", "jpg", "jpeg"},
         # Current academic year of the upcoming NBA visit (2025 = CAY 2025-26): default for new programs.
         DEFAULT_CAY=int(os.environ.get("DEFAULT_CAY", "2025")),
-        DEMO=os.environ.get("CMRSARATHI_DEMO", "") == "1",  # show the demo login on the login page
+        DEMO=os.environ.get("CMRSARATHI_DEMO", "") == "1",
+        # ERP link: "demo" (sample data), "database" (read-only ERP_DB_URL from CMRIT IT) or "off"
+        ERP_MODE=os.environ.get("ERP_MODE", "demo"),
+        ERP_DB_URL=os.environ.get("ERP_DB_URL", ""),  # show the demo login on the login page
     )
     if test_config:
         app.config.update(test_config)

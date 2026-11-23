@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_feed.html" import feed %}
 {% block title %}Programs{% endblock %}
 {% block content %}
 <div class="hero">
@@ -51,4 +52,9 @@
   </a>
   {% endfor %}
 </div>
+{% if updates %}
+<h2>Recent updates</h2>
+<p class="small muted" style="margin-top:-6px">What the HoDs, criteria heads and members did last, across {{ 'all programs' if overview else 'your programs' }}.</p>
+{{ feed(updates, true) }}
+{% endif %}
 {% endblock %}

@@ -1,0 +1,10 @@
+{% macro feed(rows, show_program=false) %}
+<div class="table-wrap"><table class="small">
+  <tr><th style="width:150px">When (UTC)</th><th>Who</th><th>What</th>{% if show_program %}<th>Program</th>{% endif %}</tr>
+  {% for a in rows %}<tr><td class="muted">{{ a.created_at[:16] }}</td>
+    <td><b>{{ a.user_name or 'System' }}</b>{% if a.user_role %}<div class="tiny muted">{{ {'principal':'Principal','hod':'HoD','crit_head':'Criteria head','member':'Criteria member'}.get(a.user_role, a.user_role) }}</div>{% endif %}</td>
+    <td><b>{{ a.action }}</b>{% if a.detail %} · {{ a.detail }}{% endif %}</td>
+    {% if show_program %}<td><a href="{{ url_for('programs.detail', program_id=a.pid) }}">{{ a.program_name }}</a></td>{% endif %}</tr>
+  {% else %}<tr><td colspan="4" class="muted center" style="padding:18px">No updates yet.</td></tr>{% endfor %}
+</table></div>
+{% endmacro %}

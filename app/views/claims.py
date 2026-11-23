@@ -181,6 +181,8 @@ def new_claim(program_id, criterion):
         vals = [program_id, criterion, code, g.user["id"], g.user["id"], _now()] + [
             ("" if v is None and k not in ("start_date", "end_date", "amount") else v) for k, v in data.items()]
         cur = db.execute(f"INSERT INTO claims ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})", vals)
+        from .. import activity
+        activity.log(db, program_id, f"Added to {code}", data.get("title") or item["title"])
         db.commit()
         files = [f for f in request.files.getlist("proof") if f and f.filename]
         n = save_proofs(program_id, cur.lastrowid, files) if files else 0
@@ -228,6 +230,8 @@ def edit_claim(program_id, criterion, claim_id):
         data["updated_by"], data["updated_at"] = g.user["id"], _now()
         db = get_db()
         db.execute(f"UPDATE claims SET {', '.join(k + ' = ?' for k in data)} WHERE id = ?", [*data.values(), claim_id])
+        from .. import activity
+        activity.log(db, program_id, f"Updated {c['item_code']}", data.get("title") or "")
         db.commit()
         flash("Entry updated.", "ok")
         return redirect(url_for("claims.detail", program_id=program_id, criterion=criterion, claim_id=claim_id))
@@ -395,6 +399,8 @@ def data_sheet(program_id, criterion):
                            "updated_by = excluded.updated_by, updated_at = datetime('now')",
                            (program_id, f["key"], y, val, g.user["id"]))
                 saved += 1
+        from .. import activity
+        activity.log(db, program_id, "Updated numbers", f"{saved} values on the Criterion 5 data sheet")
         db.commit()
         for e in errors:
             flash(e, "error")

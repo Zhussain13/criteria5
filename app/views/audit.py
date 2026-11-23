@@ -24,6 +24,9 @@ def _audit_and_save(program_id: int, user_id: int, role: str = "", kind: str = "
     cur = db.execute("INSERT INTO audits (program_id, run_by, awarded, maximum, report_json, kind, run_role, scope) "
                      "VALUES (?, ?, ?, ?, ?, 'rules', ?, '')",
                      (program_id, user_id, report["awarded"], report["audited_max"], json.dumps(report), role))
+    from .. import activity
+    activity.log(db, program_id, "Ran the audit", f"{report['awarded']} / 100 (only checked proofs: "
+                 f"{report['verified_only']['awarded']})", user_id)
     db.commit()
     return cur.lastrowid
 

@@ -19,11 +19,13 @@ app/roster.py          counts per year from the faculty list; MIN_DAYS_IN_YEAR a
 app/faculty_proofs.py  proof checks and status; faculty_issues() for the report
 app/c5audit.py         build_report(): engine run, strict (verified-only) run, issues, pre-qualifiers, award conditions
 app/views/faculty.py   faculty list, edit, import (ALIASES = ERP column names), proof upload
+app/erp.py             ERP link: DemoERP (sample data) / DatabaseERP (to fill once CMRIT IT gives access); compare()
+app/activity.py        activity log shown as "Recent updates" to head, HoD, principal
 app/demo.py            seed-demo
 ```
 
 ## Next steps
 
-1. Read-only connection to the Juno Campus ERP database (faculty, admissions) instead of the Excel export.
+1. Real ERP link: fill DatabaseERP in app/erp.py once CMRIT IT gives a read-only account and the table structure.
 2. Confirm the counting rules with the IQAC (6 months in a year; designation/degree on 1 January).
 3. Fold the faculty-list engine back into CMRSARathi when the committee approves all nine criteria.

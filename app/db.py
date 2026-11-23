@@ -48,7 +48,8 @@ def migrate(db):
                     "department": "TEXT NOT NULL DEFAULT ''", "allied": "INTEGER NOT NULL DEFAULT 0",
                     "nature": "TEXT NOT NULL DEFAULT 'Regular'", "full_time": "INTEGER NOT NULL DEFAULT 1",
                     "first_year": "INTEGER NOT NULL DEFAULT 0", "is_hod": "INTEGER NOT NULL DEFAULT 0",
-                    "apaar_id": "TEXT NOT NULL DEFAULT ''"},
+                    "apaar_id": "TEXT NOT NULL DEFAULT ''", "source": "TEXT NOT NULL DEFAULT 'manual'",
+                    "updated_by": "INTEGER", "updated_at": "TEXT"},
         "audits": {"kind": "TEXT NOT NULL DEFAULT 'rules'", "run_role": "TEXT NOT NULL DEFAULT ''",
                    "scope": "TEXT NOT NULL DEFAULT ''", "counted": "INTEGER NOT NULL DEFAULT 1"},
     }

@@ -55,7 +55,14 @@ def index():
                           "counted": pr["counted"], "proofs_ok": pr["proofs_ok"], "proofs_needed": pr["proofs_needed"],
                           "pct": round(100 * last["awarded"] / last["maximum"]) if last and last["maximum"] else 0}
     overview = g.user["role"] == "principal"
-    return render_template("programs/index.html", programs=progs, stats=stats, overview=overview)
+    updates = []
+    if progs:
+        ids = [p["id"] for p in progs]
+        updates = db.execute(
+            "SELECT a.*, u.name AS user_name, u.role AS user_role, p.name AS program_name, p.id AS pid FROM activity a "
+            "LEFT JOIN users u ON u.id = a.user_id JOIN programs p ON p.id = a.program_id WHERE a.program_id IN (%s) "
+            "ORDER BY a.id DESC LIMIT 10" % ",".join("?" * len(ids)), ids).fetchall()
+    return render_template("programs/index.html", programs=progs, stats=stats, overview=overview, updates=updates)
 
 
 def _read_program_form():
@@ -132,7 +139,10 @@ def detail(program_id):
     steps = next_steps(p, prog, acc["edit"])
     option = audit_option(db, acc)
     report = json.loads(last["report_json"]) if last else None
-    return render_template("programs/detail.html", p=p, years=years.table(), criteria=rs["criteria"], items=rs["items"],
+    from .. import activity
+
+    updates = activity.recent(db, program_id, 12)
+    return render_template("programs/detail.html", updates=updates, p=p, years=years.table(), criteria=rs["criteria"], items=rs["items"],
                            prog=prog, steps=steps, report=report, members=members, users=users, acc=acc, last=last,
                            rules_name=rs["name"], option=option, role_labels=ROLE_LABELS)
 
