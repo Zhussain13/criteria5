@@ -41,7 +41,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     def csrf_protect():
         if request.method == "POST" and not app.config.get("WTF_CSRF_DISABLED"):
             token = session.get("_csrf")
-            if not token or token != request.form.get("_csrf"):
+            sent = request.form.get("_csrf") or request.headers.get("X-CSRF")
+            if not token or token != sent:
                 abort(400, "Form expired or invalid. Please go back, reload and try again.")
 
     @app.context_processor
@@ -53,7 +54,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     import json as _json
     app.jinja_env.filters["fromjson"] = lambda v: _json.loads(v) if v else {}
 
-    from .views import auth, programs, claims, audit, admin, platform, library, faculty
+    from .views import auth, programs, claims, audit, admin, platform, library, faculty, document
     app.register_blueprint(auth.bp)
     app.register_blueprint(programs.bp)
     app.register_blueprint(claims.bp)
@@ -62,6 +63,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(platform.bp)
     app.register_blueprint(library.bp)
     app.register_blueprint(faculty.bp)
+    app.register_blueprint(document.bp)
     app.add_url_rule("/", endpoint="index", view_func=programs.index)
 
     return app

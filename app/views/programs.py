@@ -95,7 +95,7 @@ def _read_program_form():
 
 
 @bp.route("/new", methods=("GET", "POST"))
-@roles_required("principal", "hod")
+@roles_required("hod")
 def create():
     if request.method == "POST":
         errors, data = _read_program_form()
@@ -128,7 +128,7 @@ def detail(program_id):
     years = AssessmentYears(p["cay_start_year"], p["ay_start_month"])
     rs = rules.load(p["sar_version"])
     members = db.execute(
-        "SELECT u.id, u.name, u.email, u.role, m.criteria FROM program_members m JOIN users u ON u.id = m.user_id "
+        "SELECT u.id, u.name, u.email, u.role, m.criteria, m.sections FROM program_members m JOIN users u ON u.id = m.user_id "
         "WHERE m.program_id = ? ORDER BY u.name", (program_id,)).fetchall()
     users = db.execute("SELECT id, name, email, role FROM users WHERE institution_id = ? AND role IN (%s) ORDER BY name"
                        % ",".join("?" * len(TEAM_ROLES)), (p["institution_id"], *TEAM_ROLES)).fetchall()
@@ -193,6 +193,29 @@ def add_member(program_id):
                (program_id, uid, crit))
     db.commit()
     flash("Team updated.", "ok")
+    return redirect(url_for("programs.detail", program_id=program_id) + "#team")
+
+
+@bp.route("/<int:program_id>/members/<int:uid>/sections", methods=("POST",))
+@login_required
+def assign_sections(program_id, uid):
+    """HoD or criteria head: which SAR sections a criteria member types."""
+    acc = program_access(program_id)
+    if not (acc["manage_team"] or acc["role"] == "crit_head" and acc["can_draft"]):
+        abort(403)
+    db = get_db()
+    allowed = acc["sections_edit"]
+    picked = [c for c in request.form.getlist("sections") if c in allowed]
+    m = db.execute("SELECT m.*, u.name, u.role FROM program_members m JOIN users u ON u.id = m.user_id "
+                   "WHERE m.program_id = ? AND m.user_id = ?", (program_id, uid)).fetchone()
+    if m is None or m["role"] != "member":
+        abort(404)
+    db.execute("UPDATE program_members SET sections = ? WHERE program_id = ? AND user_id = ?",
+               (",".join(sorted(picked)), program_id, uid))
+    from .. import activity
+    activity.log(db, program_id, "Assigned SAR sections", f"{m['name']}: {', '.join(sorted(picked)) or 'none'}")
+    db.commit()
+    flash(f"{m['name']} now types: {', '.join(sorted(picked)) or 'no sections'}.", "ok")
     return redirect(url_for("programs.detail", program_id=program_id) + "#team")
 
 

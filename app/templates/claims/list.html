@@ -19,7 +19,7 @@
 {% if job %}<meta http-equiv="refresh" content="15"><div class="card" style="display:flex;gap:12px;align-items:center"><div class="spinner"></div><span class="small"><b>Audit running…</b> the page refreshes by itself.</span></div>{% endif %}
 {% if not can_edit %}<div class="flash error">You can view this criterion but not edit it.</div>{% endif %}
 <div class="row" style="gap:8px;margin-bottom:14px">
-  <a class="btn secondary sm" href="{{ url_for('library.sar_document', program_id=p.id, c=criterion) }}">📄 SAR document of Criterion {{ criterion }}</a>
+  <a class="btn secondary sm" href="{{ url_for('document.view', program_id=p.id) }}">📄 SAR document of Criterion {{ criterion }}</a>
   <a class="btn secondary sm" href="{{ url_for('library.proofs', program_id=p.id, c=criterion) }}">📎 Proofs of Criterion {{ criterion }}</a>
 </div>
 {% if team and acc.role in ('crit_head', 'hod', 'principal') %}

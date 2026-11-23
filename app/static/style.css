@@ -272,3 +272,32 @@ details summary { cursor: pointer; color: var(--primary); }
 .c5-items .card { margin: 0; padding: 16px; }
 .c5-items .big { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
 .risk { color: var(--bad); font-weight: 700; }
+
+/* ---------- live SAR document (Google Docs style) ---------- */
+.doc-bar { position: sticky; top: 56px; z-index: 20; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+           background: rgba(244,246,251,.96); backdrop-filter: blur(6px); padding: 10px 0 12px; margin-bottom: 8px;
+           border-bottom: 1px solid var(--line); }
+.doc-outline { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 14px; }
+.doc-outline a { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 13px; color: var(--ink-2); }
+.doc-page { background: #fff; max-width: 860px; margin: 0 auto 30px; padding: 56px 72px; border: 1px solid var(--line);
+            box-shadow: 0 2px 12px rgba(15,29,54,.08); font-family: "Times New Roman", Times, serif; font-size: 16px;
+            line-height: 1.6; color: #111; }
+.doc-title { font-family: "Times New Roman", Times, serif; font-size: 22px; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 18px; }
+.doc-sec { padding: 6px 0 18px; border-radius: 8px; transition: background .6s; scroll-margin-top: 140px; }
+.doc-sec.flash-live { background: #fff8d6; }
+.doc-sec-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.doc-sec-head h2 { font-family: "Times New Roman", Times, serif; font-size: 18px; margin: 14px 0 4px; }
+.doc-meta { font-family: var(--font); color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.doc-meta .saved { color: var(--ok); font-weight: 600; }
+.doc-text { min-height: 40px; padding: 6px 10px; margin: 0 -10px; border-radius: 6px; outline: none; }
+.doc-text.editable { border: 1px dashed transparent; cursor: text; }
+.doc-text.editable:hover { border-color: #c9d4ea; background: #fbfcff; }
+.doc-text.editable:focus, .doc-text.editable.mce-edit-focus { border-color: var(--primary); background: #fff; }
+.doc-text .placeholder { color: #98a2b3; font-style: italic; }
+.doc-auto { margin-top: 8px; border-left: 3px solid #b9c9f5; padding: 4px 0 4px 12px; }
+.doc-auto-label { font-family: var(--font); font-size: 11.5px; color: var(--primary-dark); margin-bottom: 4px; }
+.doc-auto table, .doc-text table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 4px 0 10px; }
+.doc-auto td, .doc-auto th, .doc-text td, .doc-text th { border: 1px solid #999; padding: 4px 6px; text-align: left; }
+.doc-auto th { background: #f3f5f9; font-family: var(--font); font-size: 12px; }
+.doc-auto .tcap { margin: 8px 0 2px; font-size: 14px; }
+@media (max-width: 760px) { .doc-page { padding: 24px 18px; } }

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}SAR · Criterion 5{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('programs.detail', program_id=p.id) }}">{{ p.name }}</a> › SAR document</div>
+<div class="doc-bar">
+  <div style="flex:1;min-width:220px">
+    <div class="eyebrow">SAR · Criterion 5 · live document</div>
+    <b style="font-size:17px">{{ crit.name }} ({{ crit.max }} marks)</b>
+    <div class="tiny muted" id="liveNote">🟢 Live: changes by the team appear here by themselves.
+      {% if acc.role == 'member' %}You see the sections assigned to you.{% elif acc.role == 'principal' %}Read only.{% endif %}</div>
+  </div>
+  {% if acc.can_draft %}
+  <form method="post" action="{{ url_for('document.prepare', program_id=p.id) }}" class="inline" title="ERP import for every year, proof check, SAR draft and audit">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="accent" data-busy="Preparing…">⚡ Prepare everything</button></form>
+  <form method="post" action="{{ url_for('document.draft', program_id=p.id) }}" class="inline">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="secondary" data-busy="Drafting…">✨ Draft from data</button></form>
+  {% endif %}
+  {% if option %}<form method="post" action="{{ url_for('audit.run', program_id=p.id) }}" class="inline">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="secondary" data-busy="Auditing…">▶ Run audit</button></form>{% endif %}
+  <a class="btn secondary" href="{{ url_for('audit.sar_draft', program_id=p.id) }}">⬇ Word</a>
+</div>
+
+{% if not sections %}
+<div class="card center" style="padding:36px"><div style="font-size:36px">📝</div>
+  <h2 style="margin:6px 0">No sections assigned to you yet</h2>
+  <p class="muted">Ask your criteria head or HoD to assign you sections (Program › Team).</p></div>
+{% else %}
+<div class="doc-outline">
+  {% for s in sections %}<a href="#s{{ s.code }}"><b>{{ s.code }}</b> {{ s.title }}{% if s.edit %} <span class="pill blue" style="font-size:10px">you</span>{% endif %}</a>{% endfor %}
+</div>
+<div class="doc-page">
+  <h1 class="doc-title">Criterion 5: {{ crit.name }} ({{ crit.max }})</h1>
+  {% for s in sections %}
+  <section class="doc-sec" id="s{{ s.code }}" data-code="{{ s.code }}" data-version="{{ s.version }}">
+    <div class="doc-sec-head">
+      <h2>{{ s.code }} {{ s.title }} ({{ s.max }})</h2>
+      <div class="doc-meta tiny">
+        {% if owners.get(s.code) %}<span class="pill grey">✍ {{ owners[s.code]|join(', ') }}</span>{% endif %}
+        <span class="who">{% if s.at %}{{ 'Drafted by the website' if s.drafted else 'Edited' }}{% if s.by and not s.drafted %} by {{ s.by }}{% endif %} · {{ s.at[:16] }} UTC{% else %}Not written yet{% endif %}</span>
+        <span class="saved"></span>
+        {% if acc.can_draft and s.edit %}
+        <form method="post" action="{{ url_for('document.draft', program_id=p.id) }}" class="inline"
+              onsubmit="return confirm('Replace the text of {{ s.code }} with a fresh draft from the data?')">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}"><input type="hidden" name="code" value="{{ s.code }}">
+          <button class="ghost sm">✨ Re-draft</button></form>{% endif %}
+        {% if acc.can_delete and s.edit %}
+        <form method="post" action="{{ url_for('document.clear', program_id=p.id, code=s.code) }}" class="inline"
+              onsubmit="return confirm('Clear the text of {{ s.code }}?')">
+          <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="ghost sm">🗑 Clear</button></form>{% endif %}
+      </div>
+    </div>
+    <div class="doc-text {{ 'editable' if s.edit }}" data-code="{{ s.code }}">{% if s.html %}{{ s.html|safe }}{% elif s.edit %}<p class="placeholder">Click here and type, or press “Draft from data”.</p>{% else %}<p class="muted"><em>Not written yet.</em></p>{% endif %}</div>
+    <div class="doc-auto" data-code="{{ s.code }}">
+      <div class="doc-auto-label">⚙ Filled by the website from the faculty list, ERP and data sheet · always up to date</div>
+      <div class="tables">{{ s.tables|safe }}</div>
+    </div>
+  </section>
+  {% endfor %}
+</div>
+{% endif %}
+
+<script src="{{ url_for('static', filename='tinymce/tinymce.min.js') }}"></script>
+<script>
+const CSRF = "{{ csrf_token }}", SAVE = "{{ url_for('document.save', program_id=p.id, code='CODE') }}",
+      STATE = "{{ url_for('document.state', program_id=p.id) }}";
+const versions = {}, editing = {};
+document.querySelectorAll('.doc-sec').forEach(s => versions[s.dataset.code] = +s.dataset.version);
+function meta(code, text) { const el = document.querySelector('#s' + CSS.escape(code) + ' .saved'); if (el) el.textContent = text; }
+const timers = {};
+function save(code, html) {
+  meta(code, 'Saving…');
+  fetch(SAVE.replace('CODE', code), {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF': CSRF},
+        body: JSON.stringify({html, base: versions[code], _csrf: CSRF})})
+    .then(r => r.json().then(j => [r.status, j]))
+    .then(([st, j]) => {
+      if (st === 409) { meta(code, '⚠ ' + (j.by || 'Someone') + ' changed this section. Reload to see it.'); return; }
+      versions[code] = j.version; meta(code, '✓ Saved');
+    }).catch(() => meta(code, '⚠ Not saved: check the connection'));
+}
+if (window.tinymce) tinymce.init({
+  selector: '.doc-text.editable', inline: true, menubar: false, promotion: false, branding: false,
+  plugins: 'lists table link autolink', toolbar_mode: 'wrap',
+  toolbar: 'undo redo | blocks | bold italic underline | bullist numlist | alignleft aligncenter alignjustify | table link | removeformat',
+  setup: ed => {
+    const code = ed.getElement().dataset.code;
+    ed.on('focus', () => { editing[code] = true; const ph = ed.getBody().querySelector('.placeholder'); if (ph) ed.setContent(''); });
+    ed.on('blur', () => { editing[code] = false; });
+    ed.on('input change undo redo', () => { meta(code, 'Typing…'); clearTimeout(timers[code]);
+      timers[code] = setTimeout(() => save(code, ed.getContent()), 1500); });
+  }
+});
+// Live: pick up what others wrote (sections you are not typing in) and the latest tables.
+setInterval(() => fetch(STATE).then(r => r.json()).then(st => {
+  for (const [code, s] of Object.entries(st)) {
+    const sec = document.getElementById('s' + code); if (!sec) continue;
+    sec.querySelector('.doc-auto .tables').innerHTML = s.tables;
+    if (s.version !== versions[code] && !editing[code]) {
+      versions[code] = s.version;
+      const ed = window.tinymce && tinymce.get(sec.querySelector('.doc-text').id);
+      if (ed) ed.setContent(s.html); else sec.querySelector('.doc-text').innerHTML = s.html || '<p class="muted"><em>Not written yet.</em></p>';
+      sec.querySelector('.who').textContent = 'Updated by ' + (s.by || 'the website') + ' · ' + (s.at || '').slice(0, 16) + ' UTC';
+      sec.classList.add('flash-live'); setTimeout(() => sec.classList.remove('flash-live'), 2500);
+    }
+  }
+}).catch(() => {}), 6000);
+</script>
+{% endblock %}

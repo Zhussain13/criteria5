@@ -246,7 +246,7 @@ def detail(program_id, fid):
 @login_required
 def delete(program_id, fid):
     acc = program_access(program_id)
-    if not _can_edit(acc):
+    if not acc["can_delete"]:
         abort(403)
     db = get_db()
     row = db.execute("SELECT name FROM faculty WHERE id = ? AND program_id = ?", (fid, program_id)).fetchone()
@@ -326,7 +326,7 @@ def view_proof(program_id, fid, proof_id):
 @login_required
 def delete_proof(program_id, fid, proof_id):
     acc = program_access(program_id)
-    if not _can_edit(acc):
+    if not acc["can_delete"]:
         abort(403)
     db = get_db()
     activity.log(db, program_id, "Removed proof", f"from faculty #{fid}")

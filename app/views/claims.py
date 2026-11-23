@@ -261,7 +261,7 @@ def detail(program_id, criterion, claim_id):
     saved = json.loads(c["tables_json"] or "{}")
     tables = [{**spec, "saved": saved.get(spec["id"])} for spec in rules.tables_for(acc["program"]["sar_version"], c["item_code"])]
     return render_template("claims/detail.html", p=acc["program"], criterion=criterion, c=c, item=item,
-                           proofs=pr, can_edit=can_edit, labels=FIELD_LABELS, tables=tables,
+                           proofs=pr, can_edit=can_edit, labels=FIELD_LABELS, tables=tables, acc=acc,
                            fields=fields_for(item) if item else [], kinds=dict(rules.kinds_for(item)) if item else {})
 
 
@@ -335,7 +335,7 @@ def view_proof(program_id, criterion, claim_id, proof_id):
 @login_required
 def delete_proof(program_id, criterion, claim_id, proof_id):
     acc = program_access(program_id)
-    if not _check_criterion(acc, criterion):
+    if not _check_criterion(acc, criterion) or not acc["can_delete"]:
         abort(403)
     db = get_db()
     pr = db.execute("SELECT * FROM proofs WHERE id = ? AND claim_id = ?", (proof_id, claim_id)).fetchone()
@@ -350,7 +350,7 @@ def delete_proof(program_id, criterion, claim_id, proof_id):
 @login_required
 def delete_claim(program_id, criterion, claim_id):
     acc = program_access(program_id)
-    if not _check_criterion(acc, criterion):
+    if not _check_criterion(acc, criterion) or not acc["can_delete"]:
         abort(403)
     db = get_db()
     for pr in db.execute("SELECT stored_name FROM proofs WHERE claim_id = ?", (claim_id,)).fetchall():

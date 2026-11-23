@@ -39,8 +39,7 @@ def sanitize(html: str) -> str:
     if not html or not html.strip():
         return ""
     if nh3 is None:
-        import html as _html
-        return "<p>" + _html.escape(html_to_plain(html)) + "</p>"
+        return _fallback_clean(html)
     return nh3.clean(html, tags=TAGS, attributes=ATTRS, url_schemes={"http", "https", "mailto", "data"},
                      attribute_filter=_attr_filter, filter_style_properties=STYLES, link_rel=None)
 
@@ -338,3 +337,50 @@ def add_html(container, html: str, base: dict | None = None):
 
 def html_to_plain(html: str) -> str:
     return re.sub(r"<[^>]+>", " ", html or "")
+
+
+_SAFE_TAGS = {"p", "br", "strong", "b", "em", "i", "u", "s", "ul", "ol", "li", "table", "thead", "tbody", "tr", "td",
+              "th", "h1", "h2", "h3", "h4", "span", "a", "blockquote", "sub", "sup", "hr"}
+_SAFE_ATTRS = {"a": {"href"}, "td": {"colspan", "rowspan"}, "th": {"colspan", "rowspan"}, "table": {"border"}}
+_VOID = {"br", "hr"}
+
+
+def _fallback_clean(html: str) -> str:
+    """Allow-list cleaner used only when nh3 is not installed: keeps basic formatting and tables,
+    drops scripts, styles, event handlers and unknown tags (their text stays, script/style text is dropped)."""
+    import html as _h
+    from html.parser import HTMLParser
+
+    out: list[str] = []
+    skip = [0]
+
+    class P(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            if tag in ("script", "style"):
+                skip[0] += 1
+                return
+            if skip[0] or tag not in _SAFE_TAGS:
+                return
+            keep = []
+            for k, v in attrs:
+                if k in _SAFE_ATTRS.get(tag, set()) and v is not None:
+                    if k == "href" and not re.match(r"(https?:|mailto:)", v, re.I):
+                        continue
+                    keep.append(f' {k}="{_h.escape(v, quote=True)}"')
+            out.append(f"<{tag}{''.join(keep)}>")
+
+        def handle_endtag(self, tag):
+            if tag in ("script", "style"):
+                skip[0] = max(0, skip[0] - 1)
+                return
+            if not skip[0] and tag in _SAFE_TAGS and tag not in _VOID:
+                out.append(f"</{tag}>")
+
+        def handle_data(self, data):
+            if not skip[0]:
+                out.append(_h.escape(data, quote=False))
+
+    pr = P(convert_charrefs=True)
+    pr.feed(html)
+    pr.close()
+    return "".join(out)

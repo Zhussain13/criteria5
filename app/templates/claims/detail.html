@@ -32,7 +32,7 @@
         {% if can_edit %}<a href="{{ url_for('claims.edit_claim', program_id=p.id, criterion=criterion, claim_id=c.id) }}">Fill it now →</a>{% endif %}</p>{% endif %}
     {% endfor %}
   </div>
-  {% if can_edit %}
+  {% if can_edit and acc.can_delete %}
   <form method="post" action="{{ url_for('claims.delete_claim', program_id=p.id, criterion=criterion, claim_id=c.id) }}"
         onsubmit="return confirm('Delete this entry and its proofs?')">
     <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="danger sm">Delete entry</button></form>
@@ -54,7 +54,7 @@
   <div class="card" style="padding:14px 16px">
     <div class="row between" style="flex-wrap:nowrap">
       <a href="{{ url_for('claims.view_proof', program_id=p.id, criterion=criterion, claim_id=c.id, proof_id=pr.id) }}" style="overflow:hidden;text-overflow:ellipsis"><b>📄 {{ pr.original_name }}</b></a>
-      {% if can_edit %}<form method="post" action="{{ url_for('claims.delete_proof', program_id=p.id, criterion=criterion, claim_id=c.id, proof_id=pr.id) }}" class="inline">
+      {% if can_edit and acc.can_delete %}<form method="post" action="{{ url_for('claims.delete_proof', program_id=p.id, criterion=criterion, claim_id=c.id, proof_id=pr.id) }}" class="inline">
         <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="danger sm">Remove</button></form>{% endif %}
     </div>
     <div class="row small" style="gap:6px;margin-top:8px">

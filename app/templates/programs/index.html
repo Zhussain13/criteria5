@@ -19,14 +19,14 @@
 {% endif %}
 <div class="page-head">
   <h2 style="margin:0">{{ programs|length }} program{{ '' if programs|length == 1 else 's' }}</h2>
-  {% if g.user.role in ('principal', 'hod') %}<a class="btn accent" href="{{ url_for('programs.create') }}">＋ New program</a>{% endif %}
+  {% if g.user.role == 'hod' %}<a class="btn accent" href="{{ url_for('programs.create') }}">＋ New program</a>{% endif %}
 </div>
 {% if not programs %}
   <div class="card center" style="padding:40px">
     <div style="font-size:40px">📂</div>
     <h2 style="margin:8px 0">No programs yet</h2>
-    <p class="muted">{% if g.user.role in ('principal','hod') %}Create the first one, for example "B.E. Computer Science and Engineering".{% else %}Ask your HoD or principal to add you to a program's team.{% endif %}</p>
-    {% if g.user.role in ('principal','hod') %}<a class="btn accent" href="{{ url_for('programs.create') }}">＋ Create a program</a>{% endif %}
+    <p class="muted">{% if g.user.role == 'hod' %}Create the first one, for example "B.E. Computer Science and Engineering".{% else %}Ask your HoD or principal to add you to a program's team.{% endif %}</p>
+    {% if g.user.role == 'hod' %}<a class="btn accent" href="{{ url_for('programs.create') }}">＋ Create a program</a>{% endif %}
   </div>
 {% endif %}
 <div class="grid">

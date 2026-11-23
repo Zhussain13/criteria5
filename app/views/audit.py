@@ -92,8 +92,16 @@ def sar_draft(program_id):
     wanted = {int(c) for c in request.args.getlist("c") if c.isdigit()} or set(acc["view"])
     crit = wanted & set(acc["view"])
     claims = [c for c in claims if c["criterion"] in crit]
+    from ..sar_draft import Facts, tables_html
+
+    facts = Facts(db, acc["program"])
+    texts = {r["code"]: r["html"] for r in db.execute("SELECT code, html FROM sar_sections WHERE program_id = ?",
+                                                     (program_id,))}
+    sections = {c: (texts.get(c, ""), tables_html(c, facts)) for c in acc["sections_view"]}
+    if acc["role"] == "member":  # a member downloads only the sections assigned to them
+        faculty = []
     data = build_sar_docx(dict(acc["program"]), claims, faculty, metrics, criteria=crit,
-                          settings=json.loads(acc["program"]["doc_settings"] or "{}"))
+                          settings=json.loads(acc["program"]["doc_settings"] or "{}"), sections=sections)
     name = re.sub(r"[^A-Za-z0-9]+", "_", acc["program"]["name"]).strip("_") or "program"
     if crit != set(acc["view"]) or len(crit) == 1:
         name += "_Criterion_" + "_".join(str(c) for c in sorted(crit))

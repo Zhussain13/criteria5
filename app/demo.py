@@ -34,6 +34,7 @@ LOGINS = [
     ("head", "Criteria head - Criterion 5", "crit_head"),
     ("member", "Criteria member - Criterion 5", "member"),
 ]
+MEMBER_SECTIONS = "5.1,5.2,5.4"   # the demo criteria member types these SAR sections
 DEPTS = [("CSE", "CSE", 0, 64), ("AIML", "CSE (AI & ML)", 1, 34), ("DS", "CSE (Data Science)", 1, 30)]
 STUDENTS = {("S", "CAY"): 2160, ("S", "CAYm1"): 2040, ("S", "CAYm2"): 1920,
             ("DS", "CAY"): 1200, ("DS", "CAYm1"): 1140, ("DS", "CAYm2"): 1080,
@@ -155,8 +156,8 @@ def seed(app) -> dict:
             users[key] = db.execute("INSERT INTO users (name, email, password_hash, role, institution_id) VALUES (?, ?, ?, ?, ?)",
                                     (name, f"{key}@cmrit.local", pw, role, iid)).lastrowid
             if role != "principal":
-                db.execute("INSERT INTO program_members (program_id, user_id, criteria) VALUES (?, ?, ?)",
-                           (pid, users[key], "" if role == "hod" else "5"))
+                db.execute("INSERT INTO program_members (program_id, user_id, criteria, sections) VALUES (?, ?, ?, ?)",
+                           (pid, users[key], "" if role == "hod" else "5", MEMBER_SECTIONS if role == "member" else ""))
         for (k, y), v in STUDENTS.items():
             db.execute("INSERT INTO metrics (program_id, key, year, value) VALUES (?, ?, ?, ?)", (pid, k, y, v))
 
@@ -211,6 +212,15 @@ def seed(app) -> dict:
                 _pdf([INSTITUTE, "Student strength (UG + PG), Department of CSE and allied departments", "",
                       "2025-26: 2160 (Department alone 1200)", "2024-25: 2040 (Department alone 1140)",
                       "2023-24: 1920 (Department alone 1080)"]))
+        # the SAR text drafted by the website; the member then adds a line to 5.4
+        from .sar_draft import draft_all
+
+        draft_all(db, prog, users["head"])
+        db.execute("UPDATE sar_sections SET html = html || ?, drafted = 0, version = version + 1, updated_by = ?, "
+                   "updated_at = datetime('now', '-2 days') WHERE program_id = ? AND code = '5.4'",
+                   ("<p>Courses handled: Cloud Computing, Machine Learning Lab, Cyber Security, Software Engineering and "
+                    "Computer Architecture. Students rated these sessions highly in the course-end feedback.</p>",
+                    users["member"], pid))
         # what the team did so far (shown to the head, HoD and principal under "Recent updates")
         for when, who, action, detail in [
             ("-20 days", "member", "Imported from ERP", f"{len(ids)} new faculty, 0 updated, 6 student numbers"),
@@ -219,6 +229,9 @@ def seed(app) -> dict:
             ("-12 days", "head", "Added to 5.4", "Visiting / adjunct faculty (Table 5.4.1)"),
             ("-11 days", "member", "Added to 5.1", "Student strength, Department + allied"),
             ("-10 days", "hod", "Updated numbers", "pre-qualifier facts on the Criterion 5 data sheet"),
+            ("-9 days", "hod", "Assigned SAR sections", f"Criteria member - Criterion 5: {MEMBER_SECTIONS.replace(',', ', ')}"),
+            ("-3 days", "head", "Drafted the SAR", "5 section(s) drafted"),
+            ("-2 days", "member", "Wrote SAR 5.4", "Visiting/adjunct faculty/professor of practice"),
         ]:
             db.execute("INSERT INTO activity (program_id, user_id, action, detail, created_at) VALUES "
                        "(?, ?, ?, ?, datetime('now', ?))", (pid, users[who], action, detail, when))

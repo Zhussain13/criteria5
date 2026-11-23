@@ -1,12 +1,12 @@
 """Who can see and do what. One place for every access rule, so the pages stay consistent.
 
 Roles (per institution). This app covers Criterion 5 only and uses no AI.
-- principal   head of the institution: manages users, programs and teams; sees and edits everything;
-              runs the Criterion 5 audit.
-- hod         program head: sees and edits Criterion 5 of their program(s), manages the faculty list
-              and the team; runs the audit.
-- crit_head   criteria head (Criterion 5): edits Criterion 5, checks proofs, runs the audit.
-- member      criteria member: adds faculty, data and proofs; sees the results; runs no audits.
+- principal   sees every program and the full SAR; runs the audit. Edits nothing (creates user accounts only).
+- hod         program head: every operation on every criterion of their program(s): add, edit, delete,
+              draft, import, team and section assignment, audit.
+- crit_head   criteria head: the full SAR of their criteria: add, edit, delete, draft, import; runs the audit.
+- member      criteria member: data entry and typing only, in the SAR sections assigned to them (5.1, 5.2 ...);
+              sees only those sections; deletes nothing; runs no audits.
 - superadmin  platform owner: manages institutions and their subscriptions; no SAR data access.
 """
 from __future__ import annotations
@@ -38,22 +38,29 @@ def access(db, user, prog) -> dict | None:
     all_c = set(rules["criteria"])
     inst_c = set(rules.get("institute_criteria", [])) & all_c
     role = user["role"]
-    m = db.execute("SELECT criteria FROM program_members WHERE program_id = ? AND user_id = ?",
+    m = db.execute("SELECT criteria, sections FROM program_members WHERE program_id = ? AND user_id = ?",
                    (prog["id"], user["id"])).fetchone()
     mine = _criteria_list(m["criteria"]) & all_c if m else set()
+    all_sections = set(rules["items"])
     out = {"program": prog, "role": role, "view": set(), "edit": set(), "audit": None, "audit_scope": set(),
            "limit": None, "manage_team": False, "manage_program": False, "manage_faculty": False,
-           "institute_criteria": inst_c, "program_criteria": all_c - inst_c}
+           "institute_criteria": inst_c, "program_criteria": all_c - inst_c,
+           "sections_view": set(), "sections_edit": set(), "can_delete": False, "can_draft": False}
     if role == "principal":
-        out.update(view=all_c, edit=all_c, audit="full", manage_team=True, manage_program=True, manage_faculty=True)
+        out.update(view=all_c, audit="full", sections_view=all_sections)
     elif m is None:
         return None
     elif role == "hod":
-        out.update(view=all_c, edit=all_c, audit="full", manage_team=True, manage_program=True, manage_faculty=True)
+        out.update(view=all_c, edit=all_c, audit="full", manage_team=True, manage_program=True, manage_faculty=True,
+                   sections_view=all_sections, sections_edit=all_sections, can_delete=True, can_draft=True)
     elif role == "crit_head":
-        out.update(view=mine, edit=mine, audit="full" if mine else None, manage_faculty=bool(mine))
+        secs = {c for c in all_sections if rules["items"][c]["criterion"] in mine}
+        out.update(view=mine, edit=mine, audit="full" if mine else None, manage_faculty=bool(mine),
+                   sections_view=secs, sections_edit=secs, can_delete=bool(mine), can_draft=bool(mine))
     elif role == "member":
-        out.update(view=mine, edit=mine, manage_faculty=bool(mine))
+        assigned = {c.strip() for c in (m["sections"] or "").split(",") if c.strip()} & all_sections
+        assigned = {c for c in assigned if rules["items"][c]["criterion"] in mine}
+        out.update(view=mine, edit=mine, manage_faculty=bool(mine), sections_view=assigned, sections_edit=assigned)
     else:
         return None
     out["criteria"] = out["edit"]  # older code reads "criteria" as "may edit"

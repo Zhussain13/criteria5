@@ -11,7 +11,7 @@ bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
 @bp.route("/users", methods=("GET", "POST"))
-@roles_required("principal")
+@roles_required("principal", "hod")
 def users():
     db = get_db()
     new_password = None
@@ -39,7 +39,7 @@ def users():
 
 
 @bp.route("/users/<int:uid>/reset", methods=("POST",))
-@roles_required("principal")
+@roles_required("principal", "hod")
 def reset(uid):
     db = get_db()
     pw = secrets.token_urlsafe(9)
@@ -71,7 +71,7 @@ def _read_sheet(upload) -> list[dict]:
 
 
 @bp.route("/users/import", methods=("POST",))
-@roles_required("principal")
+@roles_required("principal", "hod")
 def import_users():
     """Create many accounts at once from Excel/CSV: name, email, role, program, criteria.
     New people get a temporary password (shown once); faculty with a program are added to its team."""

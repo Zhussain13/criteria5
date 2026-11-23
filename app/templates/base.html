@@ -16,7 +16,7 @@
   {% if g.user %}
   <nav class="top">
     <a href="{{ url_for('index') }}">Programs</a>
-    {% if g.user.role == 'admin' %}<a href="{{ url_for('admin.users') }}" class="hide-sm">Users</a>{% endif %}
+    {% if g.user.role in ('principal', 'hod') %}<a href="{{ url_for('admin.users') }}" class="hide-sm">Users</a>{% endif %}
     {% if g.user.role != 'superadmin' %}<a href="{{ url_for('programs.help_page') }}">Help</a>{% endif %}
     {% if g.user.role == 'superadmin' %}<a href="{{ url_for('platform.institutions') }}">Institutions</a>{% endif %}
     <a href="{{ url_for('auth.password') }}" title="Change password"><span class="avatar">{{ g.user.name[:1] }}</span><span class="hide-sm">{{ g.user.name }}</span></a>
@@ -41,11 +41,12 @@
     {% if np.last %}<a href="{{ url_for('audit.report', program_id=nav_program.id, audit_id=np.last.id) }}" class="{{ 'active' if nav_endpoint == 'audit.report' }}"><span class="ico">📊</span> Audit report</a>{% endif %}
     {% if 5 in nav_view %}
     <div class="label">Criterion 5 · Faculty Information</div>
+    <a href="{{ url_for('document.view', program_id=nav_program.id) }}" class="{{ 'active' if nav_endpoint and nav_endpoint.startswith('document.') }}"><span class="ico">📄</span> SAR document</a>
     <a href="{{ url_for('faculty.list_faculty', program_id=nav_program.id) }}" class="{{ 'active' if nav_endpoint and nav_endpoint.startswith('faculty.') }}"><span class="ico">👥</span> Faculty list (B2.A)</a>
     <a href="{{ url_for('claims.data_sheet', program_id=nav_program.id, criterion=5) }}" class="{{ 'active' if nav_endpoint == 'claims.data_sheet' }}"><span class="ico">🧮</span> Numbers (5.1–5.5)</a>
     <a href="{{ url_for('claims.list_claims', program_id=nav_program.id, criterion=5) }}" class="{{ 'active' if nav_endpoint in ('claims.list_claims', 'claims.new_claim', 'claims.detail', 'claims.edit_claim') }}"><span class="ico">📝</span> Items &amp; documents</a>
     <div class="label">More</div>
-    <a href="{{ url_for('library.sar_document', program_id=nav_program.id) }}" class="{{ 'active' if nav_endpoint == 'library.sar_document' }}"><span class="ico">📄</span> SAR document</a>
+
     <a href="{{ url_for('library.proofs', program_id=nav_program.id) }}" class="{{ 'active' if nav_endpoint == 'library.proofs' }}"><span class="ico">📎</span> Other proofs</a>
     {% endif %}
     <a href="{{ url_for('programs.detail', program_id=nav_program.id) }}#team"><span class="ico">🧑‍🤝‍🧑</span> Team</a>

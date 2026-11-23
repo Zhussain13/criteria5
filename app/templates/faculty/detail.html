@@ -9,8 +9,8 @@
     <p class="sub" style="margin:4px 0 0">{{ f.designation }} · {{ f.qualification }} · {{ f.nature }}{% if not f.full_time %} · part-time{% endif %}</p></div>
   {% if can_edit %}<div class="actions">
     <a class="btn secondary" href="{{ url_for('faculty.edit', program_id=p.id, fid=f.id) }}">✎ Edit details</a>
-    <form method="post" action="{{ url_for('faculty.delete', program_id=p.id, fid=f.id) }}" class="inline" onsubmit="return confirm('Remove {{ f.name }} from the faculty list?')">
-      <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="danger">Remove</button></form></div>{% endif %}
+    {% if acc.can_delete %}<form method="post" action="{{ url_for('faculty.delete', program_id=p.id, fid=f.id) }}" class="inline" onsubmit="return confirm('Remove {{ f.name }} from the faculty list?')">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="danger">Remove</button></form>{% endif %}</div>{% endif %}
 </div>
 
 <div class="cols split">
@@ -61,7 +61,7 @@
         <ul class="small" style="margin:6px 0 0;padding-left:18px">
           {% for c in x.checks %}<li style="color:{{ 'var(--ok)' if c.ok else ('var(--bad)' if c.ok == false else 'var(--muted)') }}">{{ '✓' if c.ok else ('✗' if c.ok == false else '•') }} {{ c.text }}</li>{% endfor %}
         </ul></div>
-      {% if can_edit %}<form method="post" action="{{ url_for('faculty.delete_proof', program_id=p.id, fid=f.id, proof_id=x.id) }}" class="inline">
+      {% if acc.can_delete %}<form method="post" action="{{ url_for('faculty.delete_proof', program_id=p.id, fid=f.id, proof_id=x.id) }}" class="inline">
         <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="ghost sm">Remove</button></form>{% endif %}
     </div>
     {% endfor %}

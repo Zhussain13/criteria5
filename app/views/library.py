@@ -28,6 +28,12 @@ def _names(db, ids):
 @bp.route("/sar")
 @login_required
 def sar_document(program_id):
+    """The SAR now lives on the live document page."""
+    program_access(program_id)
+    return redirect(url_for("document.view", program_id=program_id))
+
+
+def _old_sar_document(program_id):
     acc = program_access(program_id)
     p = acc["program"]
     db = get_db()

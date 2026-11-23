@@ -1,5 +1,17 @@
 # Changelog
 
+## 23 Nov 2026 — SAR written by the website; live document; new rights
+
+- **SAR document (live, Google Docs style):** the website drafts the text of 5.1-5.5 from the data and builds the
+  NBA tables from the data every time. People type straight on the page; it saves itself; others see the change
+  within seconds. A section edited by a person is kept unless the head or HoD presses "Re-draft".
+- **One click "Prepare everything":** ERP import for every assessment year, proof re-check, SAR draft, audit.
+- **Rights:** criteria members see and type only the sections assigned to them and cannot delete anything; the
+  criteria head edits, adds, deletes and re-drafts the whole SAR of their criteria and assigns sections; the HoD can
+  do every operation; the principal views and runs the audit only (and creates user accounts).
+- Section assignment in Program › Team. The Word SAR follows the live document (a member's copy has only their sections).
+- 29 tests.
+
 ## 23 Nov 2026 — ERP import by academic year
 
 - The ERP import is now year-wise, as the ERP stores its data: pick the ERP academic year (e.g. 2023-24) and the

@@ -103,7 +103,8 @@ DEFAULT_SETTINGS = {"font": "Times New Roman", "size": 12, "margin_top": 2.54, "
 
 
 def build_sar_docx(program: dict, claims: list[dict], faculty: list[dict], metrics: dict,
-                   criteria: set | None = None, settings: dict | None = None) -> bytes:
+                   criteria: set | None = None, settings: dict | None = None, sections: dict | None = None) -> bytes:
+    """sections: {code: (text html, tables html)} from the live SAR document; codes missing are left out."""
     """criteria: only these criteria (None = all). settings: font, size (pt) and margins (cm)."""
     rules = load_rules(program["sar_version"])
     cfg = {**DEFAULT_SETTINGS, **(settings or {})}
@@ -174,6 +175,18 @@ def build_sar_docx(program: dict, claims: list[dict], faculty: list[dict], metri
             if item.get("evidence_file"):
                 doc.add_paragraph(f"Evidence: NBA List of Documents, file {item['evidence_file']}.")
             entries = by_item.get(code, [])
+
+            if sections is not None:
+                if code not in sections:
+                    doc.add_paragraph("(Section not included.)")
+                    continue
+                text, tables = sections[code]
+                if text.strip():
+                    add_html(doc, text)
+                else:
+                    doc.add_paragraph(TODO)
+                add_html(doc, tables)
+                continue
 
             if item["type"] == "rubric":
                 written = [c for c in entries if (c.get("sar_html") or c.get("sar_text") or "").strip()]

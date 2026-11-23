@@ -26,6 +26,10 @@
         <button class="accent lg" data-busy="Auditing…">▶ {{ option.label }}</button>
       </form>
       {% endif %}
+      {% if acc.can_draft %}<form method="post" action="{{ url_for('document.prepare', program_id=p.id) }}" class="inline"
+            title="One click: ERP import for every year, proof check, SAR draft and audit">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="accent lg" data-busy="Preparing…">⚡ Prepare everything</button></form>{% endif %}
+      <a class="btn secondary lg" href="{{ url_for('document.view', program_id=p.id) }}">📄 SAR document</a>
       {% if last %}<a class="btn secondary lg" href="{{ url_for('audit.report', program_id=p.id, audit_id=last.id) }}">View report</a>{% endif %}
     </div>
   </div>
@@ -88,14 +92,24 @@
 {{ feed(updates) }}
 
 <h2 id="team">Team</h2>
-<p class="small muted" style="margin-top:-6px">The principal sees every program automatically. HoDs, criteria heads and criteria members are added here.</p>
+<p class="small muted" style="margin-top:-6px">The principal sees every program automatically. HoDs, criteria heads and criteria members are added here.
+  Tick the SAR sections each criteria member types: they see and edit only those; the criteria head, HoD and principal see the whole document.</p>
 <div class="table-wrap">
 <table>
-  <tr><th>Name</th><th>Login</th><th>Role</th><th></th></tr>
+  <tr><th>Name</th><th>Login</th><th>Role</th><th>SAR sections they type</th><th></th></tr>
   {% for m in members %}<tr><td><b>{{ m.name }}</b></td><td>{{ m.email }}</td><td><span class="pill blue">{{ role_labels.get(m.role, m.role) }}</span></td>
+    <td>{% if m.role == 'member' %}
+      {% if acc.manage_team or (acc.role == 'crit_head' and acc.can_draft) %}
+      <form method="post" action="{{ url_for('programs.assign_sections', program_id=p.id, uid=m.id) }}" class="row" style="gap:6px">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        {% set mine = (m.sections or '').split(',') %}
+        {% for code in items %}<label class="pill grey" style="margin:0;cursor:pointer"><input type="checkbox" name="sections" value="{{ code }}" style="width:auto;margin:0 4px 0 0" {{ 'checked' if code in mine }}> {{ code }}</label>{% endfor %}
+        <button class="sm secondary">Save</button></form>
+      {% else %}{{ m.sections or 'none yet' }}{% endif %}
+    {% else %}<span class="muted small">{{ 'Whole SAR' }}</span>{% endif %}</td>
     <td style="text-align:right">{% if acc.manage_team %}<form method="post" action="{{ url_for('programs.remove_member', program_id=p.id, uid=m.id) }}" class="inline">
       <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="danger sm">Remove</button></form>{% endif %}</td></tr>
-  {% else %}<tr><td colspan="4" class="muted center" style="padding:20px">No HoD or criteria team added yet.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="5" class="muted center" style="padding:20px">No HoD or criteria team added yet.</td></tr>{% endfor %}
 </table>
 </div>
 {% if acc.manage_team %}

@@ -16,17 +16,18 @@
     <li><span class="tick todo">2</span><div class="txt"><b>Type the few numbers that are not in the list</b><span class="small muted">Numbers (5.1–5.5): student strength S and DS from the ERP admissions data, and the pre-qualifier facts. Everything else is counted from the list.</span></div></li>
     <li><span class="tick todo">3</span><div class="txt"><b>Upload the proofs</b><span class="small muted">On each person's page: the appointment letter and the highest degree certificate (PDF or phone photo). They are read with free OCR and checked at once.</span></div></li>
     <li><span class="tick todo">4</span><div class="txt"><b>Add visiting faculty (5.4)</b><span class="small muted">Items &amp; documents › 5.4: fill Table 5.4.1 (year, name, course, hours). The yearly hours are added up for you.</span></div></li>
-    <li><span class="tick todo">5</span><div class="txt"><b>Run the audit and fix</b><span class="small muted">Marks for 5.1–5.5 with the working, marks if only checked proofs count, the faculty whose proofs to fix, pre-qualifiers and likely peer-team questions.</span></div></li>
+    <li><span class="tick todo">5</span><div class="txt"><b>SAR document</b><span class="small muted">The website drafts the text and fills the NBA tables from the data. Members polish their sections like in Google Docs; everyone sees changes live.</span></div></li>
+    <li><span class="tick todo">6</span><div class="txt"><b>Run the audit and fix</b><span class="small muted">Marks for 5.1–5.5 with the working, marks if only checked proofs count, the faculty whose proofs to fix, pre-qualifiers and likely peer-team questions.</span></div></li>
   </ul>
 </div>
 
 <h2>What each role does</h2>
 <div class="grid">
   {% for key, title, items in [
-    ('principal', 'Principal', ['Creates programs and user accounts (Users).', 'Sees and edits every program; runs the audit.', 'Sees all programs side by side on the home page.']),
-    ('hod', 'HoD', ['Keeps the faculty list and the team of the program.', 'Edits everything in Criterion 5; runs the audit.', 'Downloads the Word report and the Criterion 5 SAR draft.']),
-    ('crit_head', 'Criteria head', ['Leads Criterion 5: faculty list, numbers, proofs.', 'Checks every flagged proof and gets it fixed.', 'Runs the audit after changes.']),
-    ('member', 'Criteria member', ['Adds faculty, numbers and proofs (phone camera works).', 'Sees the audit and the reasons, to know what to fix.', 'Does not run audits.']),
+    ('principal', 'Principal', ['Sees every program and the whole SAR, live.', 'Runs the audit.', 'Edits nothing (creates user accounts only).']),
+    ('hod', 'HoD', ['Every operation: add, edit, delete, draft, import from ERP.', 'Builds the team and assigns SAR sections to members.', '“Prepare everything” in one click; runs the audit.']),
+    ('crit_head', 'Criteria head', ['The whole SAR of their criteria: add, edit, delete, re-draft.', 'Assigns sections to members; checks flagged proofs.', 'Runs the audit.']),
+    ('member', 'Criteria member', ['Types only in the SAR sections assigned to them.', 'Data entry: faculty, numbers, proofs (phone camera works).', 'Cannot delete; runs no audits.']),
     ('superadmin', 'Platform owner', ['Adds colleges and their principal login.', 'Manages subscriptions.', 'Sees no college data.'])
   ] %}
   <div class="card" style="{{ 'border:2px solid var(--primary)' if key == r }}">

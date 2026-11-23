@@ -49,7 +49,8 @@ def program_progress(db, p) -> dict:
                  "entries": len(claims), "no_proof": sum(1 for c in claims if not c["n_proofs"]),
                  "empty_items": [], "data_cells": len(cells), "data_filled": filled, "tables_missing": [],
                  "proofs_needed": need, "proofs_ok": ok}}
-    return {"criteria": crits, "overall": pct, "faculty": len(faculty), "counted": len(counted), "last": last,
+    written = db.execute("SELECT COUNT(*) FROM sar_sections WHERE program_id = ? AND html != ''", (pid,)).fetchone()[0]
+    return {"criteria": crits, "overall": pct, "sar_written": written, "sar_total": len(rs["items"]), "faculty": len(faculty), "counted": len(counted), "last": last,
             "entries": len(claims), "no_proof": crits[5]["no_proof"], "proofs_needed": need, "proofs_ok": ok,
             "missing_proofs": missing_proofs, "data_cells": len(cells), "data_filled": filled}
 
@@ -70,6 +71,10 @@ def next_steps(p, prog: dict, allowed: set[int]) -> list[dict]:
          "detail": f"{prog['proofs_ok']} of {prog['proofs_needed']} appointment letters / degree certificates checked."
          if prog["proofs_needed"] else "Appointment letters and degree certificates, read with free OCR.",
          "url": url_for("faculty.list_faculty", program_id=pid, show="issues"), "cta": "Proofs to fix"},
+        {"done": prog["sar_written"] >= prog["sar_total"], "title": "Draft the SAR (one click)",
+         "detail": f"{prog['sar_written']} of {prog['sar_total']} sections written. The website drafts the text and fills "
+                   "the NBA tables from the data; the team polishes it.",
+         "url": url_for("document.view", program_id=pid), "cta": "Open SAR document"},
         {"done": prog["last"] is not None, "title": "Run the Criterion 5 audit",
          "detail": "Re-run it after every change to see the new marks." if prog["last"] else
          "Marks for 5.1-5.5, the reason for every lost mark, pre-qualifiers and the fix list.",

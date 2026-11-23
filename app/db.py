@@ -59,6 +59,8 @@ def migrate(db):
         for col, decl in cols.items():
             if col not in have:
                 db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+    if "sections" not in _cols(db, "program_members"):
+        db.execute("ALTER TABLE program_members ADD COLUMN sections TEXT NOT NULL DEFAULT ''")
     have = _cols(db, "audit_jobs")
     for col, decl in {"kind": "TEXT NOT NULL DEFAULT 'full_ai'", "scope": "TEXT NOT NULL DEFAULT ''"}.items():
         if col not in have:

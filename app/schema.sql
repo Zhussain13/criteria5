@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS program_members (
     program_id INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     criteria   TEXT NOT NULL DEFAULT '',  -- comma-separated criteria a criteria head / member works on
+    sections   TEXT NOT NULL DEFAULT '',  -- SAR sections assigned to a criteria member, e.g. '5.1,5.2'
     PRIMARY KEY (program_id, user_id)
 );
 
@@ -99,6 +100,19 @@ CREATE TABLE IF NOT EXISTS erp_imports (
     user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
     summary     TEXT NOT NULL DEFAULT '',
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- The written SAR, one section per NBA item. The tables and numbers are not stored here: they are drawn from the
+-- data every time (app/sar_draft.py), so they are never out of date. `version` goes up on every save (live view).
+CREATE TABLE IF NOT EXISTS sar_sections (
+    program_id  INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+    code        TEXT NOT NULL,
+    html        TEXT NOT NULL DEFAULT '',
+    drafted     INTEGER NOT NULL DEFAULT 0,   -- 1 = text written by the app and not changed since
+    version     INTEGER NOT NULL DEFAULT 0,
+    updated_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    updated_at  TEXT,
+    PRIMARY KEY (program_id, code)
 );
 
 -- Who changed what (shown to the criteria head, HoD and principal on the dashboard).

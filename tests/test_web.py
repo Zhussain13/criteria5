@@ -45,7 +45,8 @@ def test_login_required_and_csrf(client):
 
 
 def test_full_flow(app, logged_in):
-    c = logged_in
+    add_user(app, "hod@test.in", "hod")
+    c = login_as(app, "hod@test.in")      # the HoD creates the program and does every operation
     pid = create_program(c)
     # import the faculty list (ERP / Table B2.A style column names)
     tok = csrf(c, f"/programs/{pid}/faculty/")
@@ -88,14 +89,14 @@ def test_full_flow(app, logged_in):
         assert r.status_code == 200 and r.data[:2] == b"PK", url
     for url in ("/", f"/programs/{pid}", f"/programs/{pid}/faculty/", f"/programs/{pid}/faculty/?show=issues",
                 f"/programs/{pid}/faculty/{fid}", f"/programs/{pid}/faculty/{fid}/edit", f"/programs/{pid}/faculty/new",
-                f"/programs/{pid}/criteria/5", f"/programs/{pid}/sar", f"/programs/{pid}/proofs",
+                f"/programs/{pid}/criteria/5", f"/programs/{pid}/document/", f"/programs/{pid}/proofs",
                 "/admin/users", "/programs/help", f"/programs/{pid}/faculty/template.csv"):
         assert c.get(url).status_code == 200, url
 
 
 def test_roles(app, logged_in):
-    pid = create_program(logged_in)
-    add_user(app, "hod@test.in", "hod", pid)
+    add_user(app, "hod@test.in", "hod")
+    pid = create_program(login_as(app, "hod@test.in"))
     add_user(app, "head@test.in", "crit_head", pid, "5")
     add_user(app, "member@test.in", "member", pid, "5")
     add_user(app, "other@test.in", "member")
@@ -103,7 +104,14 @@ def test_roles(app, logged_in):
     for cl in (hod, head, member):
         assert cl.get(f"/programs/{pid}").status_code == 200
         assert cl.get(f"/programs/{pid}/faculty/new").status_code == 200   # all three keep the faculty list
-        assert cl.get("/admin/users").status_code == 403                   # only the principal manages users
+    assert head.get("/admin/users").status_code == 403 and member.get("/admin/users").status_code == 403
+    assert hod.get("/admin/users").status_code == 200
+    # the principal only views and runs the audit
+    principal = logged_in
+    assert principal.get(f"/programs/{pid}").status_code == 200
+    assert principal.get(f"/programs/{pid}/faculty/new").status_code == 403
+    assert "Run Criterion 5 audit" in principal.get(f"/programs/{pid}").get_data(as_text=True)
+    assert principal.get("/programs/new").status_code == 403
     assert other.get(f"/programs/{pid}").status_code == 403
     assert "Run Criterion 5 audit" in head.get(f"/programs/{pid}").get_data(as_text=True)
     assert "Run Criterion 5 audit" not in member.get(f"/programs/{pid}").get_data(as_text=True)

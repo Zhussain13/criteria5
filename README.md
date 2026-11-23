@@ -19,7 +19,9 @@ Same design, same logins and roles as CMRSARathi, cut down to Criterion 5 and bu
 | 4. Proof check | Each person's appointment letter and degree certificate (PDF or phone photo) is read with free OCR (pdfplumber / Tesseract) and checked: name, institute, joining date, designation, degree, university, duplicate files. Every failed check says why. |
 | 5. Audit | Marks for 5.1-5.5 with the working (NBA formulas, tested against NBA's own worked examples), grade Y/C/W/D, the marks **if the peer team accepts only checked proofs**, the faculty whose proofs to fix, NBA pre-visit qualifiers, faculty conditions for 3-year / 6-year accreditation, fix list and likely peer-team questions. |
 | 6. One shared record | What a criteria member adds (ERP import, faculty, proofs, numbers) is saved in one place, so the criteria head, HoD and principal see it at once. "Recent updates" on the dashboard (and the principal's home page) shows who did what and when; each faculty record shows its source (ERP / file / typed) and who changed it last. |
-| 7. Word files | Audit report (.docx) and the Criterion 5 SAR draft (.docx) with the data tables, Table B2.A, the proof list and the evidence index. |
+| 7. SAR document (live, like Google Docs) | **The website writes the SAR**: one click on "Draft from data" writes the text of every section (5.1-5.5) with the department's own numbers, and the NBA tables (5.1 to 5.5, 5.4.1) are built from the data every time, so they are never out of date. People only polish the text, typing straight on a clean Word-like page that saves itself. Every change appears for the others within seconds. A section a person has edited is never overwritten unless the head or HoD presses "Re-draft". |
+| 8. One click | **"Prepare everything"** (HoD, criteria head): imports every assessment year from the ERP, checks all proofs again, drafts the SAR and runs the audit. |
+| 9. Word files | Audit report (.docx) and the Criterion 5 SAR draft (.docx) with the data tables, Table B2.A, the proof list and the evidence index. |
 
 ### Formulas (NBA SAR format, Tier I, April 2026)
 
@@ -56,10 +58,10 @@ that came from the ERP.
 | Role | Can do |
 |---|---|
 | Platform owner | Adds colleges and their principal login; sees no college data. |
-| Principal | Creates programs and users; sees and edits every program; runs the audit. |
-| HoD | Keeps the faculty list and team of the program; edits Criterion 5; runs the audit. |
-| Criteria head | Leads Criterion 5 (faculty list, numbers, proofs); runs the audit. |
-| Criteria member | Adds faculty, numbers and proofs; sees the results; runs no audits. |
+| Principal | Sees every program and the whole SAR, live; runs the audit. Edits nothing (creates user accounts only). |
+| HoD | Every operation on their program: add, edit, delete, draft, ERP import, team, assigns SAR sections; runs the audit. |
+| Criteria head | The whole SAR of their criteria: add, edit, delete, re-draft, ERP import; assigns sections; runs the audit. |
+| Criteria member | Types only in the SAR sections assigned to them (e.g. 5.1, 5.2, 5.4) and sees only those; data entry (faculty, numbers, proofs); deletes nothing; runs no audits. |
 
 ## Try it
 
@@ -71,7 +73,7 @@ Demo logins (password `demo-password`; on the login page the user name alone wor
 | Principal | `principal@cmrit.local` |
 | HoD | `hod@cmrit.local` |
 | Criteria head | `head@cmrit.local` |
-| Criteria member | `member@cmrit.local` |
+| Criteria member | `member@cmrit.local` (types SAR sections 5.1, 5.2, 5.4) |
 
 The demo has CMRIT with B.E. CSE and a **made-up** faculty list of 130 people named only by position and staff code
 ("CSE Faculty 001", "HoD CSE"): no real names. A few proofs are wrong on purpose (missing letter, wrong joining date,
@@ -81,7 +83,7 @@ someone else's letter, a copied file, an M.Tech certificate for a Ph.D.) so the 
 pip install -r requirements.txt        # Tesseract binary needed only for scanned proofs / photos
 flask --app run seed-demo              # demo data
 python run.py                          # http://127.0.0.1:5000
-python -m pytest -q                    # 26 tests, all must pass
+python -m pytest -q                    # 29 tests, all must pass
 ```
 
 Or: `start.bat` (Windows), `./start.sh` (Mac/Linux), GitHub Codespaces (`.devcontainer`), or Render
@@ -97,6 +99,7 @@ there is no Tesseract, so only text PDFs are read; on the CMRIT server install T
 | ![Audit report](docs/screenshots/5_audit_report.png) | ![Proof check](docs/screenshots/6_proof_check.png) |
 | ![ERP link](docs/screenshots/7_erp_link.png) | ![Import from ERP](docs/screenshots/8_erp_import.png) |
 | ![Principal: recent updates](docs/screenshots/9_principal_updates.png) | ![ERP year in the SAR](docs/screenshots/10_erp_year_in_sar.png) |
+| ![SAR document](docs/screenshots/11_sar_document.png) | ![Member typing in an assigned section](docs/screenshots/12_member_typing.png) |
 
 ## Code map
 
@@ -105,6 +108,8 @@ app/rules/criterion5_tier1_2026.yaml  marks, formulas, data fields (auto: roster
 app/roster.py          faculty list -> year-wise Criterion 5 numbers (and the "only checked proofs" count)
 app/faculty_proofs.py  appointment letter / degree certificate checks, proof status, faculty issues
 app/erp.py             ERP link (demo / database / off) and the "what would change" comparison
+app/sar_draft.py       the website's SAR writer: section text from the data and the NBA tables (always live)
+app/views/document.py  live SAR document: section rights, autosave, live refresh, draft, one-click prepare
 app/activity.py        who did what (Recent updates for the head, HoD and principal)
 app/c5audit.py         the audit: engine + strict re-score + proofs + pre-qualifiers + award conditions
 app/engine.py          NBA scorers (shared with CMRSARathi)
