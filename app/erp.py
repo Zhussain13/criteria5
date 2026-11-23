@@ -101,7 +101,39 @@ class DemoERP:
                     "nature": r["nature"], "full_time": r["full_time"], "first_year": r["first_year"], "allied": r["allied"]}
             staff.append({**r, "this_year": this})
         s, ds = self.STUDENTS_BY_YEAR.get(CURRENT_CAY - start, (0, 0))
-        return {"faculty": staff, "students": {"S": s, "DS": ds}}
+        return {"faculty": staff, "students": {"S": s, "DS": ds}, "classes": self.classes(start, s, ds)}
+
+    PROGRAMS = [("UG", "B.E. Computer Science and Engineering", 0), ("UG", "B.E. CSE (Artificial Intelligence and "
+                "Machine Learning)", 1), ("UG", "B.E. CSE (Data Science)", 1), ("PG", "M.Tech Computer Science and "
+                "Engineering", 0)]
+
+    def classes(self, start: int, s: int, ds: int) -> list[dict]:
+        """Class-wise strength that adds up to S (all) and DS (department alone), as the ERP keeps it."""
+        rng = random.Random(start)
+        pg = 36
+        ug_dept, allied = ds - pg, s - ds
+        out = []
+
+        def split(total, n=3):
+            base = [total // n] * n
+            for i in range(total - sum(base)):
+                base[i] += 1
+            for i in range(n - 1):  # a little variation between classes, same total
+                d = rng.randint(-3, 3)
+                base[i] += d
+                base[i + 1] -= d
+            return base
+
+        for seq, (lvl, name, al) in enumerate(self.PROGRAMS, 1):
+            if lvl == "PG":
+                c = [18, 18, 0]
+            elif not al:
+                c = split(ug_dept)
+            else:
+                half = allied // 2 if seq == 2 else allied - allied // 2
+                c = split(half)
+            out.append({"seq": seq, "level": lvl, "name": name, "allied": al, "c1": c[0], "c2": c[1], "c3": c[2]})
+        return out
 
 
 class DatabaseERP:
@@ -239,6 +271,12 @@ def import_year(db, program, con, start: int, slot: str, user_id, with_students:
                    "full_time, first_year, allied) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                    (ids[P.normalise_name(r["name"])], slot, pv["ay_label"], t["designation"], t["qualification"],
                     t["nature"], t["full_time"], t["first_year"], t["allied"]))
+    if with_students and pv["data"].get("classes"):
+        db.execute("DELETE FROM student_strength WHERE program_id = ? AND year = ?", (program["id"], slot))
+        for c in pv["data"]["classes"]:
+            db.execute("INSERT INTO student_strength (program_id, year, ay_label, seq, level, name, allied, c1, c2, c3) "
+                       "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (program["id"], slot, pv["ay_label"], c["seq"], c["level"],
+                                                                c["name"], c["allied"], c["c1"], c["c2"], c["c3"]))
     if with_students:
         for k in ("S", "DS"):
             db.execute("INSERT INTO metrics (program_id, key, year, value, updated_by) VALUES (?, ?, ?, ?, ?) "

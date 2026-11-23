@@ -15,3 +15,5 @@ services:
         value: "1"
       - key: CMRSARATHI_SECRET_KEY
         generateValue: true
+      - key: GEMINI_API_KEY      # free key from https://aistudio.google.com/apikey (set it in the Render dashboard)
+        sync: false

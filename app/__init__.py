@@ -21,6 +21,9 @@ def create_app(test_config: dict | None = None) -> Flask:
         # Current academic year of the upcoming NBA visit (2025 = CAY 2025-26): default for new programs.
         DEFAULT_CAY=int(os.environ.get("DEFAULT_CAY", "2025")),
         DEMO=os.environ.get("CMRSARATHI_DEMO", "") == "1",
+        # AI audit (Gemini, free key from AI Studio). Empty = the platform owner can paste it under Platform > AI settings.
+        GEMINI_API_KEY=os.environ.get("GEMINI_API_KEY", ""),
+        AI_MODEL=os.environ.get("AI_MODEL", ""),
         # ERP link: "demo" (sample data), "database" (read-only ERP_DB_URL from CMRIT IT) or "off"
         ERP_MODE=os.environ.get("ERP_MODE", "demo"),
         ERP_DB_URL=os.environ.get("ERP_DB_URL", ""),  # show the demo login on the login page
@@ -50,6 +53,11 @@ def create_app(test_config: dict | None = None) -> Flask:
         if "_csrf" not in session:
             session["_csrf"] = secrets.token_hex(16)
         return {"csrf_token": session["_csrf"]}
+
+    @app.context_processor
+    def inject_ai():
+        from . import ai as _ai
+        return {"ai_on": _ai.enabled}
 
     import json as _json
     app.jinja_env.filters["fromjson"] = lambda v: _json.loads(v) if v else {}

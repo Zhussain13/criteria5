@@ -91,6 +91,22 @@ CREATE TABLE IF NOT EXISTS faculty_year (
     PRIMARY KEY (faculty_id, year)
 );
 
+-- Student strength per program and class for one SAR year (SAR Table No. 5.1.2), read from the ERP.
+-- UG programs: c1, c2, c3 = students in 2nd, 3rd, 4th year (B, C, D). PG programs: c1, c2 = 1st, 2nd year (A, B).
+CREATE TABLE IF NOT EXISTS student_strength (
+    program_id  INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+    year        TEXT NOT NULL,
+    ay_label    TEXT NOT NULL,
+    seq         INTEGER NOT NULL,
+    level       TEXT NOT NULL,               -- UG / PG
+    name        TEXT NOT NULL,               -- e.g. B.E. Computer Science and Engineering
+    allied      INTEGER NOT NULL DEFAULT 0,  -- 1 = program of an allied department
+    c1          INTEGER NOT NULL DEFAULT 0,
+    c2          INTEGER NOT NULL DEFAULT 0,
+    c3          INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (program_id, year, seq)
+);
+
 -- Each ERP import: which ERP academic year went into which SAR year, by whom.
 CREATE TABLE IF NOT EXISTS erp_imports (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -113,6 +129,12 @@ CREATE TABLE IF NOT EXISTS sar_sections (
     updated_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
     updated_at  TEXT,
     PRIMARY KEY (program_id, code)
+);
+
+-- Settings the platform owner can change in the app (e.g. the Gemini API key for the AI audit).
+CREATE TABLE IF NOT EXISTS app_settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT ''
 );
 
 -- Who changed what (shown to the criteria head, HoD and principal on the dashboard).

@@ -29,6 +29,9 @@
       {% if acc.can_draft %}<form method="post" action="{{ url_for('document.prepare', program_id=p.id) }}" class="inline"
             title="One click: ERP import for every year, proof check, SAR draft and audit">
         <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="accent lg" data-busy="Preparing…">⚡ Prepare everything</button></form>{% endif %}
+{% if option and ai_on() %}<form method="post" action="{{ url_for('audit.run', program_id=p.id) }}" class="inline" title="Gemini reviews the written SAR like a peer team">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}"><input type="hidden" name="kind" value="ai">
+        <button class="secondary lg" data-busy="AI reviewing…">🤖 Run AI audit</button></form>{% endif %}
       <a class="btn secondary lg" href="{{ url_for('document.view', program_id=p.id) }}">📄 SAR document</a>
       {% if last %}<a class="btn secondary lg" href="{{ url_for('audit.report', program_id=p.id, audit_id=last.id) }}">View report</a>{% endif %}
     </div>

@@ -21,14 +21,46 @@ def _audit_and_save(program_id: int, user_id: int, role: str = "", kind: str = "
     p = db.execute("SELECT * FROM programs WHERE id = ?", (program_id,)).fetchone()
     report = build_report(db, p)
     report["scope"] = []
+    if kind == "ai":
+        report["ai"] = ai_review(db, p, report)
+        report["kind"] = "ai"
+        report["kind_label"] = "NBA formulas + proof checks + AI peer-team review (" + \
+            (report["ai"].get("model") or "Gemini") + ")" if not report["ai"].get("error") else report["kind_label"]
+        for sct in report["ai"].get("sections", []):
+            report["peer_team_questions"].extend(sct.get("questions", []))
+        report["peer_team_questions"] = list(dict.fromkeys(report["peer_team_questions"]))[:50]
     cur = db.execute("INSERT INTO audits (program_id, run_by, awarded, maximum, report_json, kind, run_role, scope) "
-                     "VALUES (?, ?, ?, ?, ?, 'rules', ?, '')",
-                     (program_id, user_id, report["awarded"], report["audited_max"], json.dumps(report), role))
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, '')",
+                     (program_id, user_id, report["awarded"], report["audited_max"], json.dumps(report),
+                      report["kind"], role))
     from .. import activity
-    activity.log(db, program_id, "Ran the audit", f"{report['awarded']} / 100 (only checked proofs: "
-                 f"{report['verified_only']['awarded']})", user_id)
+    ai_txt = ""
+    if report.get("ai") and not report["ai"].get("error"):
+        ai_txt = f"; AI review {report['ai']['overall_score']}/100"
+    activity.log(db, program_id, "Ran the AI audit" if kind == "ai" else "Ran the audit",
+                 f"{report['awarded']} / 100 (only checked proofs: {report['verified_only']['awarded']}){ai_txt}", user_id)
     db.commit()
     return cur.lastrowid
+
+
+def ai_review(db, p, report) -> dict:
+    """Gemini reviews the SAR of every section like a peer team. Marks stay as computed by the formulas."""
+    from .. import ai
+    from ..sar_draft import Facts, auto_html, section_codes
+    from .document import refresh_drafts
+
+    refresh_drafts(db, p)
+    f = Facts(db, p)
+    texts = {r["code"]: r["html"] for r in db.execute("SELECT code, html FROM sar_sections WHERE program_id = ?",
+                                                     (p["id"],))}
+    marks = {it["code"]: it for it in report["criteria"][0]["items"]}
+    secs = [{"code": c, "title": marks[c]["title"], "max": marks[c]["max"], "marks": marks[c]["awarded"],
+             "auto_html": auto_html(c, f), "writeup_html": texts.get(c, "")} for c in section_codes(p)]
+    years = ", ".join(f"{y} = {f.lbl[y]}" for y in ("CAY", "CAYm1", "CAYm2", "CAYm3"))
+    try:
+        return ai.review(p, secs, years)
+    except ai.AIError as e:
+        return {"error": str(e)}
 
 
 def running_job(program_id: int):
@@ -36,19 +68,29 @@ def running_job(program_id: int):
     return None
 
 
-def start_audit(acc: dict) -> tuple[str, int | None]:
+def start_audit(acc: dict, kind: str = "rules") -> tuple[str, int | None]:
+    from .. import ai
+
     db = get_db()
     if audit_option(db, acc) is None:
         abort(403)
-    return "Audit complete.", _audit_and_save(acc["program"]["id"], g.user["id"], acc["role"])
+    if kind == "ai" and not ai.enabled():
+        return "The AI audit needs a Gemini API key (Platform owner › AI settings).", None
+    audit_id = _audit_and_save(acc["program"]["id"], g.user["id"], acc["role"], kind)
+    if kind == "ai":
+        rep = json.loads(get_db().execute("SELECT report_json FROM audits WHERE id = ?", (audit_id,)).fetchone()[0])
+        if rep.get("ai", {}).get("error"):
+            return "Audit complete, but the AI review did not run: " + rep["ai"]["error"], audit_id
+        return "AI audit complete.", audit_id
+    return "Audit complete.", audit_id
 
 
 @bp.route("/run", methods=("POST",))
 @login_required
 def run(program_id):
     acc = program_access(program_id)
-    msg, audit_id = start_audit(acc)
-    flash(msg, "ok" if "used up" not in msg else "error")
+    msg, audit_id = start_audit(acc, "ai" if request.form.get("kind") == "ai" else "rules")
+    flash(msg, "error" if ("did not run" in msg or "needs" in msg) else "ok")
     if audit_id:
         return redirect(url_for("audit.report", program_id=program_id, audit_id=audit_id))
     back = request.form.get("back", "")
@@ -93,7 +135,9 @@ def sar_draft(program_id):
     crit = wanted & set(acc["view"])
     claims = [c for c in claims if c["criterion"] in crit]
     from ..sar_draft import Facts, tables_html
+    from .document import refresh_drafts
 
+    refresh_drafts(db, acc["program"])
     facts = Facts(db, acc["program"])
     texts = {r["code"]: r["html"] for r in db.execute("SELECT code, html FROM sar_sections WHERE program_id = ?",
                                                      (program_id,))}
@@ -173,6 +217,21 @@ def download(program_id, audit_id):
         for c in aw.get("faculty_conditions", []):
             doc.add_paragraph(f"{c['label']}: " + ("faculty conditions met" if c["met"] else "not met - " + "; ".join(c["unmet"])),
                               style="List Bullet")
+
+    aiv = rep.get("ai") or {}
+    if aiv and not aiv.get("error"):
+        doc.add_heading(f"AI peer-team review: {aiv['overall_score']} / 100 ({aiv.get('model', '')})", 1)
+        doc.add_paragraph(aiv.get("summary", ""))
+        doc.add_paragraph("The marks stay as computed by the NBA formulas; this review rates the written SAR.")
+        for a_ in aiv.get("top_actions", []):
+            doc.add_paragraph(a_, style="List Number")
+        for s_ in aiv.get("sections", []):
+            doc.add_heading(f"{s_['code']} {s_['title']}: {s_['score']} / 10", 2)
+            if s_.get("verdict"):
+                doc.add_paragraph(s_["verdict"])
+            for k, label in (("strengths", "Strength"), ("gaps", "Gap"), ("data_checks", "Text vs numbers")):
+                for x in s_.get(k, []):
+                    doc.add_paragraph(f"{label}: {x}", style="List Bullet")
 
     issues = rep.get("faculty_issues") or []
     ps = rep.get("proof_summary") or {}

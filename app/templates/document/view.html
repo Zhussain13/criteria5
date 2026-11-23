@@ -17,6 +17,9 @@
   {% endif %}
   {% if option %}<form method="post" action="{{ url_for('audit.run', program_id=p.id) }}" class="inline">
     <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="secondary" data-busy="Auditing…">▶ Run audit</button></form>{% endif %}
+{% if option and ai_on() %}<form method="post" action="{{ url_for('audit.run', program_id=p.id) }}" class="inline" title="Gemini reviews the written SAR like a peer team">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}"><input type="hidden" name="kind" value="ai">
+        <button class="secondary" data-busy="AI reviewing…">🤖 Run AI audit</button></form>{% endif %}
   <a class="btn secondary" href="{{ url_for('audit.sar_draft', program_id=p.id) }}">⬇ Word</a>
 </div>
 
@@ -29,7 +32,9 @@
   {% for s in sections %}<a href="#s{{ s.code }}"><b>{{ s.code }}</b> {{ s.title }}{% if s.edit %} <span class="pill blue" style="font-size:10px">you</span>{% endif %}</a>{% endfor %}
 </div>
 <div class="doc-page">
-  <h1 class="doc-title">Criterion 5: {{ crit.name }} ({{ crit.max }})</h1>
+  <h1 class="doc-title">CRITERION 5 &nbsp; {{ crit.name }} <span style="float:right">{{ crit.max }}</span></h1>
+  <details class="doc-5a"><summary><b>Table No. 5A: Faculty details</b> <span class="tiny muted">· {{ t5a.count('<tr>') - 1 }} faculty · filled from the faculty list / ERP · tap to open</span></summary>
+    <div class="doc-auto"><div class="tables">{{ t5a|safe }}</div></div></details>
   {% for s in sections %}
   <section class="doc-sec" id="s{{ s.code }}" data-code="{{ s.code }}" data-version="{{ s.version }}">
     <div class="doc-sec-head">
@@ -49,11 +54,12 @@
           <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="ghost sm">🗑 Clear</button></form>{% endif %}
       </div>
     </div>
-    <div class="doc-text {{ 'editable' if s.edit }}" data-code="{{ s.code }}">{% if s.html %}{{ s.html|safe }}{% elif s.edit %}<p class="placeholder">Click here and type, or press “Draft from data”.</p>{% else %}<p class="muted"><em>Not written yet.</em></p>{% endif %}</div>
     <div class="doc-auto" data-code="{{ s.code }}">
-      <div class="doc-auto-label">⚙ Filled by the website from the faculty list, ERP and data sheet · always up to date</div>
+      <div class="doc-auto-label">⚙ Written by the website from the faculty list, ERP and data sheet · changes by itself when the data changes</div>
       <div class="tables">{{ s.tables|safe }}</div>
     </div>
+    <div class="doc-writeup-label">✍ Department's write-up{% if s.edit %} · click and type{% endif %}</div>
+    <div class="doc-text {{ 'editable' if s.edit }}" data-code="{{ s.code }}">{% if s.html %}{{ s.html|safe }}{% elif s.edit %}<p class="placeholder">Click here and type, or press “Draft from data”.</p>{% else %}<p class="muted"><em>Not written yet.</em></p>{% endif %}</div>
   </section>
   {% endfor %}
 </div>

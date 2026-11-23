@@ -10,7 +10,12 @@ NBA Criterion 5 (Faculty Information, 100 marks), end to end, with no AI.
   Rights (owner, 23 Nov): member = typing/data entry only in assigned SAR sections, no delete; crit_head = whole SAR
   of their criteria (add/edit/delete); hod = every operation; principal = view + run audit only.
 - **Least human work:** the website drafts the SAR (app/sar_draft.py); tables always come from the data; one-click buttons.
-- **No AI.** Every mark comes from the NBA formulas in `app/engine.py`; proofs are read with pdfplumber / Tesseract.
+- **Marks never come from AI.** Every mark comes from the NBA formulas in `app/engine.py`; proofs are read with
+  pdfplumber / Tesseract. Optional AI audit (owner, 23 Nov): Gemini (free AI Studio key, GEMINI_API_KEY or
+  Platform › AI settings) reviews the written SAR like a peer team (score per section, gaps, text-vs-numbers checks,
+  questions) in ONE cached request (`app/ai.py`). Never put the key in git.
+- **Formal SAR:** the document follows the NBA SAR format, April 2026 (Table No. 5A, 5.1.2, 5.2.1, 5.3.1, 5.4.1,
+  5.5.1); the SAR part is rebuilt from the data on every view; untouched drafted write-ups follow the data too.
 - Commits: author `Shaik Mohammed Zaheed Hussain <zhussain9753@gmail.com>`, no co-author lines.
 - Every change: update README.md and docs/CHANGELOG.md in the same commit; keep `python -m pytest -q` passing.
 
@@ -24,7 +29,8 @@ app/c5audit.py         build_report(): engine run, strict (verified-only) run, i
 app/views/faculty.py   faculty list, edit, import (ALIASES = ERP column names), proof upload
 app/erp.py             ERP link, year-wise: years(), year_data(); DemoERP (sample) / DatabaseERP (to fill); compare(),
                        year_preview(), import_year() -> faculty_year + erp_imports + S/DS of that SAR year
-app/sar_draft.py       SAR text drafted from data + NBA tables built live
+app/sar_draft.py       formal SAR part per section (auto_html, live) + department write-up draft (draft_html); Table 5A
+app/ai.py              Gemini AI peer-team review (one request, cached, model fallback, quota handling)
 app/views/document.py  live SAR document (sections, autosave, /state polling, draft, clear, prepare)
 app/activity.py        activity log shown as "Recent updates" to head, HoD, principal
 app/demo.py            seed-demo

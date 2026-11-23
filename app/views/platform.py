@@ -2,7 +2,7 @@
 import re
 import secrets
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from werkzeug.security import generate_password_hash
 
 from ..db import get_db
@@ -56,3 +56,38 @@ def update(iid):
     db.commit()
     flash("Institution updated.", "ok")
     return redirect(url_for("platform.institutions"))
+
+
+@bp.route("/ai", methods=("GET", "POST"))
+@roles_required("superadmin")
+def ai_settings():
+    """The Gemini API key for the AI audit (free key from Google AI Studio)."""
+    from .. import ai
+
+    db = get_db()
+    if request.method == "POST":
+        if request.form.get("action") == "remove":
+            db.execute("DELETE FROM app_settings WHERE key = 'gemini_api_key'")
+            db.commit()
+            flash("API key removed. The AI audit is off.", "ok")
+            return redirect(url_for("platform.ai_settings"))
+        key = request.form.get("key", "").strip()
+        model = request.form.get("model", "").strip()
+        if key:
+            db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('gemini_api_key', ?)", (key,))
+        db.execute("INSERT OR REPLACE INTO app_settings (key, value) VALUES ('ai_model', ?)", (model,))
+        db.commit()
+        if request.form.get("action") == "test" or key:
+            try:
+                used = ai.test_key()
+                flash(f"The key works. Model answering: {used}.", "ok")
+            except ai.AIError as e:
+                flash(str(e), "error")
+        else:
+            flash("Saved.", "ok")
+        return redirect(url_for("platform.ai_settings"))
+    k = ai.api_key()
+    src = "environment (GEMINI_API_KEY)" if current_app.config.get("GEMINI_API_KEY") else ("saved here" if k else "")
+    model = db.execute("SELECT value FROM app_settings WHERE key = 'ai_model'").fetchone()
+    return render_template("platform/ai.html", masked=(k[:4] + "…" + k[-4:]) if k else "", source=src,
+                           model=model["value"] if model else "", models=ai.DEFAULT_MODELS)

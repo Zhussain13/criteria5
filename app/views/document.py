@@ -17,13 +17,20 @@ from ..db import get_db
 from ..permissions import audit_option
 from ..richtext import sanitize
 from ..rules import load as load_rules
-from ..sar_draft import Facts, draft_all, section_codes, tables_html
+from ..sar_draft import Facts, auto_html, draft_all, section_codes, table_5a
 from .auth import login_required, program_access
 
 bp = Blueprint("document", __name__, url_prefix="/programs/<int:program_id>/document")
 
 
+def refresh_drafts(db, p):
+    """Text still as the website drafted it follows the data at once; text a person edited is never touched."""
+    if draft_all(db, p, None, only_drafted=True):
+        db.commit()
+
+
 def _sections(db, p, acc, codes=None) -> list[dict]:
+    refresh_drafts(db, p)
     rules = load_rules(p["sar_version"])
     rows = {r["code"]: r for r in db.execute(
         "SELECT s.*, u.name AS by_name FROM sar_sections s LEFT JOIN users u ON u.id = s.updated_by "
@@ -37,8 +44,12 @@ def _sections(db, p, acc, codes=None) -> list[dict]:
         out.append({"code": code, "title": it["title"], "max": it["max"], "html": r["html"] if r else "",
                     "version": r["version"] if r else 0, "drafted": bool(r and r["drafted"]),
                     "by": (r["by_name"] if r else "") or "", "at": (r["updated_at"] if r else "") or "",
-                    "tables": tables_html(code, f), "edit": code in acc["sections_edit"]})
+                    "tables": auto_html(code, f), "edit": code in acc["sections_edit"]})
     return out
+
+
+def _table_5a(db, p, acc) -> str:
+    return table_5a(Facts(db, p)) if acc["sections_view"] else ""
 
 
 @bp.route("/")
@@ -55,7 +66,7 @@ def view(program_id):
         for c in (t["sections"] or "").split(","):
             if c.strip():
                 owners.setdefault(c.strip(), []).append(t["name"])
-    return render_template("document/view.html", p=p, acc=acc, sections=secs, owners=owners,
+    return render_template("document/view.html", p=p, acc=acc, sections=secs, owners=owners, t5a=_table_5a(db, p, acc),
                            option=audit_option(db, acc), crit=load_rules(p["sar_version"])["criteria"][5])
 
 

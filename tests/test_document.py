@@ -17,8 +17,10 @@ def test_document_rights_and_live_saves(app):
     full = hod.get("/programs/1/document/").get_data(as_text=True)
     for code in ("5.1", "5.2", "5.3", "5.4", "5.5"):
         assert f'id="s{code}"' in full
-    assert "The average SFR for" in full and "Table 5.1: Student-faculty ratio" in full
-    assert "Filled by the website" in full
+    for t in ("Table No. 5A: Faculty details", "Table No. 5.1.2: Student-faculty ratio", "Table No. 5.2.1",
+              "Table No. 5.3.1", "Table No. 5.4.1", "Table No. 5.5.1", "Average SFR for 3 years", "Assessment:"):
+        assert t in full, t
+    assert "Written by the website" in full and "Department&#39;s write-up" in full or "Department's write-up" in full
     # the member sees only the sections assigned to them
     mine = member.get("/programs/1/document/").get_data(as_text=True)
     assert 'id="s5.1"' in mine and 'id="s5.4"' in mine and 'id="s5.3"' not in mine and 'id="s5.5"' not in mine
@@ -51,7 +53,7 @@ def test_document_rights_and_live_saves(app):
     assert head.get("/programs/1/document/state").get_json()["5.5"]["html"] == ""
     head.post("/programs/1/document/draft", data={"_csrf": ht})   # fills the cleared one, keeps the member's text
     s = head.get("/programs/1/document/state").get_json()
-    assert "retention" in s["5.5"]["html"] and "Member note on SFR." in s["5.1"]["html"]
+    assert "served the institute" in s["5.5"]["html"] and "Member note on SFR." in s["5.1"]["html"]
     # HoD assigns sections to the member
     with app.app_context():
         uid = get_db().execute("SELECT id FROM users WHERE email = 'member@cmrit.local'").fetchone()[0]
@@ -81,7 +83,23 @@ def test_one_click_prepare_and_word(app):
     import docx
     d = docx.Document(io.BytesIO(w.data))
     text = "\n".join(p.text for p in d.paragraphs)
-    assert "The average SFR for" in text and len(d.tables) >= 8
+    assert "The SFR was" in text and "Assessment:" in text and len(d.tables) >= 7
+    cells = " ".join(c.text for t in d.tables for r in t.rows for c in r.cells)
+    assert "UG1. B" in cells and "PG1. A" in cells and "TF = Total faculty" in cells   # class-wise SFR from the ERP
     member = login(app, "member@cmrit.local")
     mt = "\n".join(p.text for p in docx.Document(io.BytesIO(member.get("/programs/1/audit/sar.docx").data)).paragraphs)
     assert "Section not included" in mt     # only the member's own sections are in their copy
+
+
+def test_drafted_text_follows_the_data(app):
+    seed(app)
+    hod = login(app, "hod@cmrit.local")
+    before = hod.get("/programs/1/document/state").get_json()["5.2"]["html"]
+    with app.app_context():
+        db = get_db()
+        db.execute("UPDATE faculty SET qualification = 'Ph.D.', phd_date = '2010-01-01' WHERE name LIKE 'CSE Faculty 00%'")
+        db.commit()
+    after = hod.get("/programs/1/document/state").get_json()["5.2"]["html"]
+    assert before != after                       # untouched draft rewritten with the new Ph.D. count
+    member_text = hod.get("/programs/1/document/state").get_json()["5.4"]["html"]
+    assert "Courses handled" in member_text      # the member's edited section was not touched

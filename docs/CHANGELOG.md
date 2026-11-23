@@ -1,5 +1,19 @@
 # Changelog
 
+## 23 Nov 2026 — formal NBA SAR, ERP class-wise data, AI audit with Gemini
+
+- **Formal SAR in the NBA format (April 2026):** Table No. 5A (faculty details), NBA instruction lines, Table No.
+  5.1.2 with every UG/PG program and class (B, C, D / A, B), DS, AS, S, DF, AF, F, PoP, FF, TF and SFR per year,
+  Table No. 5.2.1, 5.3.1 (two-row header, average numbers), 5.4.1 year by year with total hours, 5.5.1, and the
+  assessment of every item. Rebuilt from the data on every view, so any data change shows at once.
+- Drafted write-ups that nobody has edited follow the data too; edited ones are never touched.
+- **ERP demo data per year:** each academic year has its own staff list and class-wise student strength of
+  B.E. CSE, B.E. CSE (AI & ML), B.E. CSE (Data Science) and M.Tech CSE; imported into `student_strength`.
+- **AI audit (Gemini, free key):** platform owner › AI settings (or GEMINI_API_KEY). "Run AI audit" for principal,
+  HoD, criteria head. Marks stay formula-based; Gemini gives a write-up score (0-100), section scores (0-10),
+  strengths, gaps, text-vs-numbers checks, peer-team questions and top actions. One cached request per audit.
+- 32 tests (AI tested with a fake Google answer).
+
 ## 23 Nov 2026 — SAR written by the website; live document; new rights
 
 - **SAR document (live, Google Docs style):** the website drafts the text of 5.1-5.5 from the data and builds the

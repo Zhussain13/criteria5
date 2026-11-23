@@ -16,10 +16,14 @@
         <span class="pill" style="background:rgba(255,255,255,.12);color:#fff">SFR {{ aw.sfr_avg if aw.sfr_avg is not none else '?' }}</span>
         <span class="pill" style="background:rgba(255,255,255,.12);color:#fff">Ph.D. {{ aw.phd_pct if aw.phd_pct is not none else '?' }}% of required</span>
         <span class="pill" style="background:rgba(255,255,255,.12);color:#fff">Only checked proofs: {{ r.verified_only.awarded }} / 100</span>
+        {% if r.ai and not r.ai.error %}<span class="pill" style="background:rgba(255,255,255,.2);color:#fff">🤖 AI review {{ r.ai.overall_score }} / 100</span>{% endif %}
       </div>
       <p class="muted small" style="margin:8px 0 0">{{ r.rules_name }} · run {{ row.run_at[:16] }} UTC · {{ r.kind_label }}</p>
     </div>
     <div class="row">
+{% if option and ai_on() %}<form method="post" action="{{ url_for('audit.run', program_id=p.id) }}" class="inline" title="Gemini reviews the written SAR like a peer team">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}"><input type="hidden" name="kind" value="ai">
+        <button class="secondary" data-busy="AI reviewing…">🤖 Run AI audit</button></form>{% endif %}
       <a class="btn accent" href="{{ url_for('audit.download', program_id=p.id, audit_id=row.id) }}">⬇ Word report</a>
       <form method="post" action="{{ url_for('audit.run', program_id=p.id) }}" class="inline"><input type="hidden" name="_csrf" value="{{ csrf_token }}">
         <button class="secondary" data-busy="Auditing…">↻ Re-run</button></form>
@@ -28,6 +32,7 @@
 </div>
 
 <div class="row" style="gap:8px;margin-bottom:16px">
+  {% if r.ai %}<a class="btn secondary sm" href="#ai">AI review</a>{% endif %}
   <a class="btn secondary sm" href="#summary">Marks</a>
   <a class="btn secondary sm" href="#proofs">Faculty proofs{% if r.faculty_issues %} ({{ r.faculty_issues|length }}){% endif %}</a>
   {% if r.fix_list %}<a class="btn secondary sm" href="#fix">Fix list</a>{% endif %}
@@ -62,6 +67,34 @@
   </table></div>
   <p class="help">Faculty conditions are counted from the faculty list; approval, batches and other programs are typed on the Numbers page (rows marked "PQ").</p>
 </div>
+{% endif %}
+
+{% if r.ai %}
+<h2 id="ai">🤖 AI peer-team review</h2>
+{% if r.ai.error %}<div class="flash error">{{ r.ai.error }}</div>
+{% else %}
+<div class="card" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap;border-left:5px solid var(--primary)">
+  <div class="ring light" style="--p:{{ r.ai.overall_score }};--c:{{ '#16865a' if r.ai.overall_score >= 75 else ('#2f5bea' if r.ai.overall_score >= 60 else '#e8742a') }};width:92px;height:92px">
+    <div style="width:70px;height:70px"><b style="font-size:20px">{{ r.ai.overall_score }}</b><span class="tiny">/ 100</span></div></div>
+  <div style="flex:1;min-width:240px"><b>Write-up quality, as a peer team would judge it</b>
+    <p class="small" style="margin:6px 0 0">{{ r.ai.summary }}</p>
+    <p class="tiny muted" style="margin:6px 0 0">Reviewed by {{ r.ai.model }}. The marks above stay as computed by the NBA formulas; this score rates how well the SAR is written and justified.</p></div>
+</div>
+{% if r.ai.top_actions %}<div class="card"><b>Do these first</b><ol class="small" style="margin:6px 0 0 18px;padding:0">{% for a in r.ai.top_actions %}<li style="margin:3px 0">{{ a }}</li>{% endfor %}</ol></div>{% endif %}
+<div class="grid">
+  {% for s_ in r.ai.sections %}
+  <div class="card" style="margin:0">
+    <div class="row between"><b>{{ s_.code }} {{ s_.title }}</b>
+      <span class="pill {{ 'ok' if s_.score >= 7.5 else ('blue' if s_.score >= 6 else 'warn') }}" style="font-size:13px">{{ s_.score }} / 10</span></div>
+    <p class="small" style="margin:6px 0">{{ s_.verdict }}</p>
+    {% for k, label, col in [('strengths', 'Strengths', 'var(--ok)'), ('gaps', 'Gaps', 'var(--warn)'), ('data_checks', 'Text vs numbers', 'var(--bad)')] %}
+      {% if s_[k] %}<div class="tiny" style="color:{{ col }};font-weight:700;margin-top:6px">{{ label }}</div>
+      <ul class="small" style="margin:2px 0 0 18px;padding:0">{% for x in s_[k] %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 {% endif %}
 
 <h2 id="summary">Marks by item</h2>

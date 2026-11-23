@@ -140,7 +140,7 @@ def build_sar_docx(program: dict, claims: list[dict], faculty: list[dict], metri
         doc.add_heading(f"Criterion {num}: {crit['name']} ({crit['max']} marks)", 1)
 
         fields = [f for f in rules.get("data_fields", []) if f["criterion"] == num]
-        if fields:
+        if fields and sections is None:
             ys = sorted({y for f in fields for y in f["years"]}, key=YEAR_NAMES.index)
             doc.add_heading(f"Data tables for Criterion {num}", 2)
             rows = [[f["label"]] + [_num(metrics.get((f["key"], y))) if y in f["years"] else "-" for y in ys]
@@ -151,7 +151,7 @@ def build_sar_docx(program: dict, claims: list[dict], faculty: list[dict], metri
                 doc.add_paragraph(f"{missing} value(s) not entered yet (blank cells).")
 
         if num == 5 and faculty:
-            doc.add_heading("Table B2.A: Faculty details (Department + allied departments)", 2)
+            doc.add_heading("Table No. 5A: Faculty details (Department and allied departments)", 2)
             rows = []
             for i, f in enumerate(faculty, 1):
                 rows.append([str(i), f.get("name") or "", f.get("qualification") or "", f.get("university") or "",
@@ -181,11 +181,11 @@ def build_sar_docx(program: dict, claims: list[dict], faculty: list[dict], metri
                     doc.add_paragraph("(Section not included.)")
                     continue
                 text, tables = sections[code]
+                add_html(doc, tables)
                 if text.strip():
                     add_html(doc, text)
                 else:
                     doc.add_paragraph(TODO)
-                add_html(doc, tables)
                 continue
 
             if item["type"] == "rubric":

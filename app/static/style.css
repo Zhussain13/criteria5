@@ -301,3 +301,13 @@ details summary { cursor: pointer; color: var(--primary); }
 .doc-auto th { background: #f3f5f9; font-family: var(--font); font-size: 12px; }
 .doc-auto .tcap { margin: 8px 0 2px; font-size: 14px; }
 @media (max-width: 760px) { .doc-page { padding: 24px 18px; } }
+
+.doc-title span { font-size: 18px; }
+.doc-5a { margin: 0 0 14px; font-family: var(--font); font-size: 14px; }
+.doc-5a summary { cursor: pointer; padding: 6px 0; }
+.doc-5a .doc-auto table { font-size: 11px; }
+.doc-auto .nba-note { color: #444; font-size: 14px; margin: 2px 0 6px; }
+.doc-auto .assess { margin: 6px 0 2px; font-size: 15px; }
+.doc-auto .src { font-family: var(--font); font-size: 11.5px; color: var(--muted); margin: 2px 0; }
+.doc-auto { border-left: 3px solid #b9c9f5; padding-left: 12px; }
+.doc-writeup-label { font-family: var(--font); font-size: 11.5px; color: var(--accent-dark); margin: 10px 0 2px; }

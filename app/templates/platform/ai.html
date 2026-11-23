@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}AI settings{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('platform.institutions') }}">Platform</a> › AI settings</div>
+<div class="eyebrow">Platform owner</div><h1>AI settings</h1>
+<p class="sub">The AI audit uses Google's Gemini API. A free key comes from
+  <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.
+  The marks always come from the NBA formulas; the AI adds a peer-team review of the written SAR.</p>
+<div class="card" style="max-width:720px">
+  <div class="row between"><b>Gemini API key</b>
+    {% if masked %}<span class="pill ok">Set · {{ masked }} · {{ source }}</span>{% else %}<span class="pill warn">Not set: AI audit off</span>{% endif %}</div>
+  <form method="post" style="margin-top:10px">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <label>Paste the key (leave empty to keep the current one)</label>
+    <input type="password" name="key" autocomplete="off" placeholder="AIza…">
+    <label>Model</label>
+    <select name="model"><option value="">Automatic (first one the key can use)</option>
+      {% for m in models %}<option {{ 'selected' if m == model }}>{{ m }}</option>{% endfor %}</select>
+    <div class="form-actions" style="position:static">
+      <button class="lg" name="action" value="save">💾 Save and test</button>
+      {% if masked %}<button class="secondary" name="action" value="test">Test the key</button>
+      <button class="danger" name="action" value="remove" onclick="return confirm('Remove the key?')">Remove</button>{% endif %}
+    </div>
+  </form>
+  <p class="help">On Google's free tier, Google may use what is sent to improve its products: use dummy data, or a paid key,
+    for real SAR data. On Render, prefer the GEMINI_API_KEY environment variable (the demo database is reset on every restart).</p>
+</div>
+{% endblock %}

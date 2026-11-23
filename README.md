@@ -5,7 +5,8 @@
 This is the one-criterion pilot of [CMRSARathi](https://github.com/Zhussain13/CMRSARathi), the CMRIT Mega Project
 (Dept. of CSE, CMR Institute of Technology, Bengaluru) for NBA SAR preparation and audit. The committee asked for one
 criterion working end to end before the full nine; Criterion 5 was chosen because every mark comes from an NBA formula,
-so the free Gemini quota is never touched: **no AI tokens are used at all**.
+so the marks never depend on AI. An **optional AI audit** with a free Gemini key adds a peer-team review of the
+written SAR (one request per audit, cached).
 
 Same design, same logins and roles as CMRSARathi, cut down to Criterion 5 and built around the faculty list.
 
@@ -19,7 +20,7 @@ Same design, same logins and roles as CMRSARathi, cut down to Criterion 5 and bu
 | 4. Proof check | Each person's appointment letter and degree certificate (PDF or phone photo) is read with free OCR (pdfplumber / Tesseract) and checked: name, institute, joining date, designation, degree, university, duplicate files. Every failed check says why. |
 | 5. Audit | Marks for 5.1-5.5 with the working (NBA formulas, tested against NBA's own worked examples), grade Y/C/W/D, the marks **if the peer team accepts only checked proofs**, the faculty whose proofs to fix, NBA pre-visit qualifiers, faculty conditions for 3-year / 6-year accreditation, fix list and likely peer-team questions. |
 | 6. One shared record | What a criteria member adds (ERP import, faculty, proofs, numbers) is saved in one place, so the criteria head, HoD and principal see it at once. "Recent updates" on the dashboard (and the principal's home page) shows who did what and when; each faculty record shows its source (ERP / file / typed) and who changed it last. |
-| 7. SAR document (live, like Google Docs) | **The website writes the SAR**: one click on "Draft from data" writes the text of every section (5.1-5.5) with the department's own numbers, and the NBA tables (5.1 to 5.5, 5.4.1) are built from the data every time, so they are never out of date. People only polish the text, typing straight on a clean Word-like page that saves itself. Every change appears for the others within seconds. A section a person has edited is never overwritten unless the head or HoD presses "Re-draft". |
+| 7. SAR document (live, like Google Docs) | **A formal SAR in the NBA format** (April 2026): CRITERION 5 heading, Table No. 5A (faculty details), and for each item NBA's instruction line, the NBA table (5.1.2 with every UG/PG program and class B/C/D, A/B; 5.2.1; 5.3.1; 5.4.1 year by year with total hours; 5.5.1), the calculation and the assessment. This SAR part is written by the website from the data and changes by itself the moment any data changes. **The website writes the SAR**: one click on "Draft from data" writes the text of every section (5.1-5.5) with the department's own numbers, and the NBA tables (5.1 to 5.5, 5.4.1) are built from the data every time, so they are never out of date. People only polish the text, typing straight on a clean Word-like page that saves itself. Every change appears for the others within seconds. A section a person has edited is never overwritten unless the head or HoD presses "Re-draft". |
 | 8. One click | **"Prepare everything"** (HoD, criteria head): imports every assessment year from the ERP, checks all proofs again, drafts the SAR and runs the audit. |
 | 9. Word files | Audit report (.docx) and the Criterion 5 SAR draft (.docx) with the data tables, Table B2.A, the proof list and the evidence index. |
 
@@ -37,13 +38,27 @@ Counting rules the IQAC should confirm (constants in `app/roster.py`): a person 
 least 6 months of it; designation and degree are taken as on 1 January of the year; PoP counted up to 20% of required
 faculty (NBA Annexure-I).
 
+## AI audit (Gemini, free key)
+
+- Get a free key at https://aistudio.google.com/apikey. Put it in `GEMINI_API_KEY` (Render: Environment), or log in as
+  the platform owner › **AI settings** › paste › "Save and test".
+- Then the principal, HoD and criteria head see **🤖 Run AI audit** (dashboard, SAR document, report).
+- The marks stay exactly as the NBA formulas give them. Gemini reads the whole Criterion 5 SAR (SAR part + write-up)
+  like a peer team and returns: an overall write-up score (0-100), a score per section (0-10) with strengths, gaps,
+  sentences that do not agree with the numbers, peer-team questions and the top actions. Shown in the report and the
+  Word report.
+- One request per audit; answers are cached (same SAR text = no new call); model fallback; if the free quota is used
+  up or the key is wrong, the audit still runs and says why the AI part is missing.
+- On Google's free tier Google may use the content to improve its products: use the dummy data, or a paid key, for
+  real SAR data.
+
 ## ERP link
 
 `ERP_MODE` (environment variable):
 
 | Mode | What it does |
 |---|---|
-| `demo` (default) | Demo connection with sample year-wise data (2021-22 to 2025-26) shaped like a Juno Campus export: 2 new joinees, 1 person who left, 1 promotion since the last import. Clearly labelled as sample data on screen. |
+| `demo` (default) | Demo connection with sample year-wise data (2021-22 to 2025-26) shaped like a Juno Campus export: the staff list of each year, the class-wise student strength of every UG/PG program for each year (for Table No. 5.1.2), 2 new joinees, 1 person who left, 1 promotion. Clearly labelled as sample data on screen. |
 | `database` | Read-only connection to the ERP database (`ERP_DB_URL`). Needs a read-only account and the table structure from CMRIT IT; until the tables are mapped it says "not connected". |
 | `off` | No ERP button. |
 
@@ -83,7 +98,7 @@ someone else's letter, a copied file, an M.Tech certificate for a Ph.D.) so the 
 pip install -r requirements.txt        # Tesseract binary needed only for scanned proofs / photos
 flask --app run seed-demo              # demo data
 python run.py                          # http://127.0.0.1:5000
-python -m pytest -q                    # 29 tests, all must pass
+python -m pytest -q                    # 32 tests, all must pass
 ```
 
 Or: `start.bat` (Windows), `./start.sh` (Mac/Linux), GitHub Codespaces (`.devcontainer`), or Render
@@ -110,6 +125,7 @@ app/faculty_proofs.py  appointment letter / degree certificate checks, proof sta
 app/erp.py             ERP link (demo / database / off) and the "what would change" comparison
 app/sar_draft.py       the website's SAR writer: section text from the data and the NBA tables (always live)
 app/views/document.py  live SAR document: section rights, autosave, live refresh, draft, one-click prepare
+app/ai.py              optional Gemini AI peer-team review of the written SAR
 app/activity.py        who did what (Recent updates for the head, HoD and principal)
 app/c5audit.py         the audit: engine + strict re-score + proofs + pre-qualifiers + award conditions
 app/engine.py          NBA scorers (shared with CMRSARathi)

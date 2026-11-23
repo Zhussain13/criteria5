@@ -19,6 +19,7 @@
     {% if g.user.role in ('principal', 'hod') %}<a href="{{ url_for('admin.users') }}" class="hide-sm">Users</a>{% endif %}
     {% if g.user.role != 'superadmin' %}<a href="{{ url_for('programs.help_page') }}">Help</a>{% endif %}
     {% if g.user.role == 'superadmin' %}<a href="{{ url_for('platform.institutions') }}">Institutions</a>{% endif %}
+    {% if g.user.role == 'superadmin' %}<a href="{{ url_for('platform.ai_settings') }}">AI settings</a>{% endif %}
     <a href="{{ url_for('auth.password') }}" title="Change password"><span class="avatar">{{ g.user.name[:1] }}</span><span class="hide-sm">{{ g.user.name }}</span></a>
     <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
       <input type="hidden" name="_csrf" value="{{ csrf_token }}">
@@ -60,7 +61,7 @@
   </main>
 </div>
 {% endblock %}
-<footer>CMRSARathi · Criterion 5 pilot · CMR Institute of Technology, Bengaluru · NBA formulas, no AI · the NBA peer team takes the final decision.</footer>
+<footer>CMRSARathi · Criterion 5 pilot · CMR Institute of Technology, Bengaluru · marks by NBA formulas · optional AI peer-team review · the NBA peer team takes the final decision.</footer>
 <script>
   // Show "working" on slow buttons (audit, uploads) so nobody clicks twice.
   document.addEventListener('submit', e => {
