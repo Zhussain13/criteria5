@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Log in{% endblock %}
+{% block shell %}
+<div class="auth">
+  <section class="pitch">
+    <div class="eyebrow" style="color:#ffb27a">{{ inst.name if inst else 'CMRSARathi platform' }}</div>
+    <h1>{{ 'NBA Criterion 5, prepared once and audited like a peer team would.' if inst else 'Manage institutions and subscriptions.' }}</h1>
+    <p>Faculty Information (100 marks): the faculty list, the NBA formulas and a check of every appointment letter and degree certificate. No AI.</p>
+    <div class="feat"><div class="i">✅</div><div><b>Every proof checked</b><span>Name, institute, joining date, designation and degree, read with free OCR.</span></div></div>
+    <div class="feat"><div class="i">🧮</div><div><b>NBA formulas, exactly</b><span>SFR, faculty qualification, cadre, visiting faculty and retention, counted from the faculty list.</span></div></div>
+    <div class="feat"><div class="i">🎯</div><div><b>Know what to fix</b><span>Marks at risk, the faculty whose proofs to fix, pre-qualifiers and likely peer-team questions.</span></div></div>
+  </section>
+  <section class="formside">
+    <div class="card">
+      <a href="{{ url_for('auth.login') }}" class="small muted">‹ Change institution</a>
+      <div class="row" style="margin:12px 0 4px;flex-wrap:nowrap">
+        <span class="inst-logo">{{ ((inst.short_name or inst.name) if inst else 'CS')[:2] }}</span>
+        <div><h1 style="font-size:22px;margin:0">{{ (inst.short_name or inst.name) if inst else 'Platform owner' }}</h1>
+          <div class="small muted">{{ inst.name if inst and inst.short_name else 'Sign in' }}</div></div>
+      </div>
+      {% for cat, msg in get_flashed_messages(with_categories=true) %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+      <form method="post" action="{{ url_for('auth.login', inst=code, next=request.args.get('next')) }}" id="loginform">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <label for="email">Email or username</label>
+        <input type="text" id="email" name="email" required autofocus autocapitalize="none" placeholder="you@cmrit.ac.in">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required placeholder="••••••••••">
+        <p style="margin-top:20px"><button class="lg" style="width:100%">Log in</button></p>
+      </form>
+      {% if demo_users %}
+      <div class="flash ok" style="display:block;margin-top:14px">
+        <b>Demo site:</b> usernames <code>principal</code>, <code>hod</code>, <code>head</code>, <code>member</code>
+        password <code>demo-password</code>. Or tap a person:
+        <div class="row" style="gap:6px;margin-top:8px">
+          {% for u in demo_users %}<button type="button" class="sm secondary" onclick="email.value='{{ u.email }}';password.value='demo-password';loginform.submit()">{{ u.name }}</button>{% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

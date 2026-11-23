@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}SAR document{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('programs.detail', program_id=p.id) }}">{{ p.name }}</a> › SAR document</div>
+<div class="page-head">
+  <div><div class="eyebrow">SAR document{% if wanted %} · Criterion {{ wanted }}{% endif %}</div><h1>{{ p.name }}</h1>
+    <p class="sub" style="margin:4px 0 0">Every section the teams wrote, merged in NBA order with their formatting. Empty sections are marked.</p></div>
+  <div class="actions">
+    <a class="btn accent" href="{{ url_for('audit.sar_draft', program_id=p.id, c=wanted) if wanted else url_for('audit.sar_draft', program_id=p.id) }}">⬇ Download Word</a>
+    <button class="secondary" onclick="window.print()">🖨 Print / PDF</button>
+  </div>
+</div>
+<div class="row no-print" style="gap:6px;margin-bottom:14px">
+  <a class="btn sm {{ 'secondary' if wanted else '' }}" href="{{ url_for('library.sar_document', program_id=p.id) }}">All</a>
+  {% for n in all_criteria %}<a class="btn sm {{ '' if wanted == n else 'secondary' }}" href="{{ url_for('library.sar_document', program_id=p.id, c=n) }}">Criterion {{ n }}</a>{% endfor %}
+</div>
+
+<div class="grid no-print" style="margin-bottom:16px">
+  {% for c in criteria %}
+  <a class="card" href="#c{{ c.number }}" style="padding:14px 16px">
+    <div class="row between small"><b>Criterion {{ c.number }}</b><span>{{ c.done }} / {{ c.total }} sections</span></div>
+    <div class="small muted" style="margin:2px 0 8px">{{ c.name }}</div>
+    <div class="bar {{ 'ok' if c.pct >= 100 }}"><span style="width:{{ c.pct }}%"></span></div>
+  </a>
+  {% endfor %}
+</div>
+
+{% if acc.manage_program %}
+<details class="card no-print" style="padding:14px 18px"><summary><b>Document look</b> <span class="small muted">font, size and margins of the SAR (editor and Word download)</span></summary>
+<form method="post" action="{{ url_for('library.sar_settings', program_id=p.id) }}" style="margin-top:8px">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <div class="cols3">
+    <div><label>Font</label><select name="font">{% for f in ['Times New Roman','Arial','Calibri','Cambria','Georgia','Verdana'] %}<option {{ 'selected' if settings.font == f }}>{{ f }}</option>{% endfor %}</select></div>
+    <div><label>Size (pt)</label><input type="number" step="0.5" min="8" max="16" name="size" value="{{ settings.size }}"></div>
+    <div></div>
+  </div>
+  <div class="cols3" style="grid-template-columns:repeat(4,1fr)">
+    {% for k, lab in [('margin_top','Top'),('margin_bottom','Bottom'),('margin_left','Left'),('margin_right','Right')] %}
+    <div><label>{{ lab }} margin (cm)</label><input type="number" step="0.1" min="0.5" max="6" name="{{ k }}" value="{{ settings[k] }}"></div>{% endfor %}
+  </div>
+  <p style="margin-bottom:0"><button class="sm">Save</button></p>
+</form>
+</details>
+{% endif %}
+
+<div class="sar-paper" style="font-family:'{{ settings.font }}';font-size:{{ settings.size }}pt">
+{% for c in criteria %}
+  <h2 id="c{{ c.number }}" class="sar-crit">Criterion {{ c.number }}: {{ c.name }} ({{ c.max }})</h2>
+  {% for it in c['items'] %}
+    <div class="sar-sec {{ '' if it.written or not it.is_written_section else 'empty' }}">
+      <div class="row between" style="flex-wrap:nowrap;align-items:baseline">
+        <h3>{{ it.code }} {{ it.item.title }} ({{ it.item.max }})</h3>
+        <span class="no-print small" style="white-space:nowrap">
+          {% if it.is_written_section and not it.written %}<span class="pill warn">Not written yet</span>{% endif %}
+          {% if c.can_edit %}<a href="{{ url_for('claims.new_claim', program_id=p.id, criterion=c.number, item_code=it.code) }}">{{ 'Add' if not it.entries else 'Add more' }}</a>{% endif %}
+        </span>
+      </div>
+      {% for e, html in it.texts %}
+        <div class="sar-text">{{ html }}</div>
+        <div class="no-print tiny muted" style="margin:-4px 0 10px">by {{ names.get(e.created_by, '–') }}{% if e.updated_at %} · updated {{ e.updated_at[:16] }}{% if e.updated_by and e.updated_by != e.created_by %} by {{ names.get(e.updated_by) }}{% endif %}{% endif %}
+          · <a href="{{ url_for('claims.detail', program_id=p.id, criterion=c.number, claim_id=e.id) }}">open</a></div>
+      {% endfor %}
+      {% for t in it.tables %}
+        {% for f in (t.filled or [none]) %}
+        <p><b>Table No. {{ t.spec.id }}: {{ t.spec.title }}</b></p>
+        {% if f %}{% for k, v in f.fields.items() %}<p style="margin:2px 0">{{ k }}: {{ v }}</p>{% endfor %}{% endif %}
+        {% if t.spec.columns %}<table class="sar-tbl"><tr>{% for col in t.spec.columns %}<th>{{ col.name }}</th>{% endfor %}</tr>
+          {% if f %}{% for row in f.rows %}<tr>{% for v in row %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}
+          {% else %}<tr><td colspan="{{ t.spec.columns|length }}" class="muted"><i>To be filled</i></td></tr>{% endif %}</table>{% endif %}
+        {% endfor %}
+      {% endfor %}
+      {% if it.is_written_section and not it.written %}<p class="muted"><i>[To be written]</i></p>{% endif %}
+    </div>
+  {% endfor %}
+{% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block shell %}
+<div class="auth">
+  <section class="pitch">
+    <div class="eyebrow" style="color:#ffb27a">CMRSARathi · Criterion 5</div>
+    <h1>NBA Criterion 5, prepared once and audited like a peer team would.</h1>
+    <p>Each institution has its own private space: its programs, faculty lists, proofs and audit reports.</p>
+    <div class="feat"><div class="i">🏛️</div><div><b>Principal</b><span>Overview of every program, its faculty list, proofs and Criterion 5 audit.</span></div></div>
+    <div class="feat"><div class="i">🧑‍🏫</div><div><b>HoD and criteria teams</b><span>Keep the faculty list, upload proofs, track progress.</span></div></div>
+    <div class="feat"><div class="i">🎯</div><div><b>No-AI audit</b><span>NBA formulas and proof checks: marks with the reason for every lost mark.</span></div></div>
+  </section>
+  <section class="formside">
+    <div class="card">
+      <h1 style="font-size:24px">Sign in</h1>
+      <p class="sub">Choose your institution</p>
+      {% for cat, msg in get_flashed_messages(with_categories=true) %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}
+      <div class="inst-list">
+        {% for i in institutions %}
+        <a class="inst" href="{{ url_for('auth.login', inst=i.code) }}">
+          <span class="inst-logo">{{ (i.short_name or i.name)[:2] }}</span>
+          <span><b>{{ i.short_name or i.name }}</b><span class="small muted">{{ i.name if i.short_name else '' }}</span></span>
+          <span class="muted" style="margin-left:auto">›</span>
+        </a>
+        {% else %}<p class="muted">No institutions yet. The platform owner adds them.</p>{% endfor %}
+      </div>
+      <p class="center small" style="margin:18px 0 0"><a href="{{ url_for('auth.login', inst='platform') }}" class="muted">Platform owner sign-in</a></p>
+    </div>
+  </section>
+</div>
+{% endblock %}

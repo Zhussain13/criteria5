@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if fid else 'Add' }} faculty{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('programs.detail', program_id=p.id) }}">{{ p.name }}</a> ›
+  <a href="{{ url_for('faculty.list_faculty', program_id=p.id) }}">Faculty list</a> › {{ 'Edit' if fid else 'Add' }}</div>
+<h1>{{ f.name if fid else 'Add a faculty member' }}</h1>
+<p class="sub">The same columns as NBA Table B2.A. Dates as on the appointment and promotion letters.</p>
+<form method="post" class="card">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <div class="cols">
+    <div><label>Name</label><input type="text" name="name" required value="{{ f.name or '' }}"></div>
+    <div><label>APAAR faculty ID (if any)</label><input type="text" name="apaar_id" value="{{ f.apaar_id or '' }}"></div>
+  </div>
+  <div class="cols3">
+    <div><label>Present designation</label><select name="designation">{% for d in designations %}<option {{ 'selected' if f.designation == d }}>{{ d }}</option>{% endfor %}</select></div>
+    <div><label>Designation at joining</label><select name="designation_at_joining"><option value="">Same as present</option>{% for d in designations %}<option {{ 'selected' if f.designation_at_joining == d and f.designation_at_joining != f.designation }}>{{ d }}</option>{% endfor %}</select></div>
+    <div><label>Date designated (if promoted)</label><input type="date" name="designated_on" value="{{ f.designated_on or '' }}"></div>
+  </div>
+  <div class="cols3">
+    <div><label>Date of joining this institute</label><input type="date" name="joining_date" required value="{{ f.joining_date or '' }}"></div>
+    <div><label>Date of leaving (if left)</label><input type="date" name="leaving_date" value="{{ f.leaving_date or '' }}"></div>
+    <div><label>Nature of association</label><select name="nature">{% for n in natures %}<option {{ 'selected' if f.nature == n }}>{{ n }}</option>{% endfor %}</select></div>
+  </div>
+  <div class="cols3">
+    <div><label>Highest degree</label><select name="qualification">{% for d in degrees %}<option {{ 'selected' if f.qualification == d }}>{{ d }}</option>{% endfor %}</select></div>
+    <div><label>Ph.D. awarded on (if Ph.D.)</label><input type="date" name="phd_date" value="{{ f.phd_date or '' }}"></div>
+    <div><label>University of the highest degree</label><input type="text" name="university" value="{{ f.university or '' }}"></div>
+  </div>
+  <div class="cols3">
+    <div><label>Department</label><input type="text" name="department" value="{{ f.department or '' }}"></div>
+    <div><label>Area of specialization</label><input type="text" name="specialization" value="{{ f.specialization or '' }}"></div>
+    <div><label>Experience (years)</label><input type="text" name="experience_years" value="{{ f.experience_years or '' }}"></div>
+  </div>
+  <div class="row" style="gap:18px;margin-top:10px">
+    {% for k, label in [('allied', 'Allied department'), ('full_time', 'Full-time'), ('first_year', '100% first-year teaching load'), ('is_hod', 'HoD of this department')] %}
+    <label class="small" style="margin:0"><input type="checkbox" name="{{ k }}" value="1" style="width:auto" {{ 'checked' if f[k] in (1, '1', True) }}> {{ label }}</label>
+    {% endfor %}
+  </div>
+  <div class="form-actions"><button class="lg">💾 Save</button>
+    <a class="btn ghost" href="{{ url_for('faculty.detail', program_id=p.id, fid=fid) if fid else url_for('faculty.list_faculty', program_id=p.id) }}">Cancel</a></div>
+</form>
+{% endblock %}

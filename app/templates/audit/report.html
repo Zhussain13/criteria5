@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Audit report{% endblock %}
+{% block content %}
+{% set aw = r.award %}
+{% set pct = (100 * r.awarded / r.audited_max)|round|int if r.audited_max else 0 %}
+{% set good = aw.grade == 'Y' %}{% set mid = aw.grade == 'C' %}
+<div class="crumbs"><a href="{{ url_for('programs.detail', program_id=p.id) }}">{{ p.name }}</a> › Audit report</div>
+<div class="hero">
+  <div class="row" style="gap:24px;align-items:center;position:relative;z-index:1">
+    <div class="ring" style="--p:{{ pct }};--c:{{ '#34b07f' if good else ('#f6a04d' if mid else '#ff7a6e') }}">
+      <div><b>{{ r.awarded|round(1) }}</b><span>of {{ r.audited_max|int }}</span></div></div>
+    <div style="flex:1;min-width:240px">
+      <div class="eyebrow" style="color:#ffb27a">Criterion 5 · Faculty Information</div>
+      <h1 style="margin:2px 0 6px">{{ aw.status }}</h1>
+      <div class="row" style="gap:6px">
+        <span class="pill" style="background:rgba(255,255,255,.12);color:#fff">SFR {{ aw.sfr_avg if aw.sfr_avg is not none else '?' }}</span>
+        <span class="pill" style="background:rgba(255,255,255,.12);color:#fff">Ph.D. {{ aw.phd_pct if aw.phd_pct is not none else '?' }}% of required</span>
+        <span class="pill" style="background:rgba(255,255,255,.12);color:#fff">Only checked proofs: {{ r.verified_only.awarded }} / 100</span>
+      </div>
+      <p class="muted small" style="margin:8px 0 0">{{ r.rules_name }} · run {{ row.run_at[:16] }} UTC · {{ r.kind_label }}</p>
+    </div>
+    <div class="row">
+      <a class="btn accent" href="{{ url_for('audit.download', program_id=p.id, audit_id=row.id) }}">⬇ Word report</a>
+      <form method="post" action="{{ url_for('audit.run', program_id=p.id) }}" class="inline"><input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <button class="secondary" data-busy="Auditing…">↻ Re-run</button></form>
+    </div>
+  </div>
+</div>
+
+<div class="row" style="gap:8px;margin-bottom:16px">
+  <a class="btn secondary sm" href="#summary">Marks</a>
+  <a class="btn secondary sm" href="#proofs">Faculty proofs{% if r.faculty_issues %} ({{ r.faculty_issues|length }}){% endif %}</a>
+  {% if r.fix_list %}<a class="btn secondary sm" href="#fix">Fix list</a>{% endif %}
+  {% if r.consistency %}<a class="btn secondary sm" href="#numbers">Numbers that do not agree ({{ r.consistency|length }})</a>{% endif %}
+  <a class="btn secondary sm" href="#details">Item-by-item</a>
+  {% if r.peer_team_questions %}<a class="btn secondary sm" href="#questions">Peer-team questions</a>{% endif %}
+</div>
+
+<div class="card">
+  <b>Faculty conditions for the accreditation award (NBA Tier I)</b>
+  <div class="cols" style="margin-top:8px">
+  {% for c in aw.faculty_conditions %}
+    <div class="card flat" style="margin:0;border-left:5px solid {{ 'var(--ok)' if c.met else 'var(--warn)' }}">
+      <b>{{ c.label }}</b> <span class="pill {{ 'ok' if c.met else 'warn' }}">{{ 'met' if c.met else 'not met' }}</span>
+      {% if c.unmet %}<ul class="small" style="margin:6px 0 0 18px;padding:0">{% for u in c.unmet %}<li>{{ u }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+  {% endfor %}
+  </div>
+  <p class="help">The award itself needs all nine criteria; these are the parts that come from the faculty data.</p>
+</div>
+
+{% if r.pre_qualifiers %}
+{% set pq_bad = r.pre_qualifiers | selectattr('status', 'ne', 'Complied') | list %}
+<div class="card">
+  <div class="row between"><b>Pre-visit qualifiers (NBA Annexure-I, April 2026)</b>
+    <span class="pill {{ 'ok' if not pq_bad else 'bad' }}">{{ 'All 6 complied: eligible for a visit' if not pq_bad else (pq_bad|length|string) + ' of 6 not complied / not entered' }}</span></div>
+  <div class="table-wrap" style="box-shadow:none;margin:10px 0 0">
+  <table class="small">
+    <tr><th>#</th><th>Qualifier</th><th>Now</th><th>Status</th></tr>
+    {% for q in r.pre_qualifiers %}<tr><td>{{ q.no }}</td><td>{{ q.text }}</td><td>{{ q.current or '–' }}</td>
+      <td><span class="pill {{ 'ok' if q.status == 'Complied' else ('bad' if q.status == 'Not complied' else 'warn') }}">{{ q.status }}</span></td></tr>{% endfor %}
+  </table></div>
+  <p class="help">Faculty conditions are counted from the faculty list; approval, batches and other programs are typed on the Numbers page (rows marked "PQ").</p>
+</div>
+{% endif %}
+
+<h2 id="summary">Marks by item</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>Item</th><th style="width:110px">Marks</th><th style="width:180px">Only checked proofs</th><th style="width:220px">Score</th></tr>
+  {% for it in r.criteria[0]['items'] %}{% set ip = (100 * it.awarded / it.max)|round|int %}
+  <tr>
+    <td><a href="#i{{ it.code }}"><b>{{ it.code }} {{ it.title }}</b></a></td>
+    <td><b>{{ it.awarded }}</b> <span class="muted">/ {{ it.max }}</span></td>
+    <td>{% if it.awarded_verified < it.awarded %}<span class="risk">{{ it.awarded_verified }}</span>{% else %}{{ it.awarded_verified }}{% endif %}</td>
+    <td><div class="bar {{ 'ok' if ip >= 75 else ('' if ip >= 60 else 'warn') }}"><span style="width:{{ ip }}%"></span></div><span class="small muted">{{ ip }}%</span></td>
+  </tr>
+  {% endfor %}
+  <tr><td><b>Criterion 5 total</b></td><td><b>{{ r.awarded }}</b> / 100</td><td><b>{{ r.verified_only.awarded }}</b></td><td>grade <b>{{ aw.grade }}</b></td></tr>
+</table>
+</div>
+<p class="help">Grades: Y ≥ 75%, C 60–75%, W 40–60%, D below 40%. Every mark follows the NBA formulas. "Only checked proofs" = the marks if the peer team counts only faculty whose appointment letter (and degree certificate, for Ph.D./M.Tech) was checked.</p>
+
+<h2 id="proofs">Faculty proofs (NBA file P.21)</h2>
+{% set ps = r.proof_summary %}
+<div class="stats">
+  <div class="stat"><div class="v">{{ ps.faculty_counted }}</div><div class="k">faculty counted</div></div>
+  <div class="stat"><div class="v">{{ ps.appointment_verified }}</div><div class="k">appointment letters checked</div></div>
+  <div class="stat"><div class="v">{{ ps.degree_verified }}/{{ ps.degree_needed }}</div><div class="k">Ph.D./M.Tech certificates checked</div></div>
+  <div class="stat"><div class="v" style="color:{{ 'var(--bad)' if ps.with_issues else 'var(--ok)' }}">{{ ps.with_issues }}</div><div class="k">faculty with a problem</div></div>
+</div>
+{% if r.faculty_issues %}
+<div class="table-wrap">
+<table class="small">
+  <tr><th>Faculty</th><th>Counted in</th><th>Problem</th><th>What to do</th><th></th></tr>
+  {% for i in r.faculty_issues %}{% for pr in i.problems %}
+  <tr><td>{% if loop.first %}<b>{{ i.name }}</b><div class="muted">{{ i.designation }} · {{ i.qualification }}</div>{% endif %}</td>
+    <td>{% if loop.first %}{{ i.years|join(', ') }}{% endif %}</td>
+    <td><span class="pill {{ 'warn' if 'No ' in pr.reason else 'bad' }}">{{ pr.kind }}</span> {{ pr.reason }}</td>
+    <td>{{ pr.fix }}</td>
+    <td>{% if loop.first %}<a class="btn sm secondary" href="{{ url_for('faculty.detail', program_id=p.id, fid=i.id) }}">Open</a>{% endif %}</td></tr>
+  {% endfor %}{% endfor %}
+</table></div>
+{% else %}<div class="card flat">All faculty proofs checked. Nothing to fix.</div>{% endif %}
+
+{% if r.fix_list %}
+<h2 id="fix">Fix list: where the marks are</h2>
+<div class="card" style="padding:6px 20px">
+  <ul class="steps">
+  {% for f in r.fix_list[:15] %}
+    <li><span class="tick todo">{{ loop.index }}</span>
+      <div class="txt"><a href="#i{{ f.code }}"><b>{{ f.code }} {{ f.title }}</b></a></div>
+      <span class="pill warn">+{{ f.marks_recoverable }} marks</span>
+      <a class="btn sm secondary" href="{{ url_for('faculty.list_faculty', program_id=p.id, show='issues') if f.code == 'P.21' else url_for('claims.data_sheet', program_id=p.id, criterion=5) }}">Fix</a></li>
+  {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if r.consistency %}
+<h2 id="numbers">Numbers that do not agree</h2>
+<p class="small muted" style="margin-top:-6px">These do not change the marks, but a peer team will notice them and ask. Fix them before submitting.</p>
+{% for x in r.consistency %}
+<div class="card" style="padding:14px 18px;border-left:5px solid {{ 'var(--bad)' if x.severity == 'error' else 'var(--warn)' }}">
+  <div class="row between"><b>{{ x.title }}</b>
+    <span class="pill {{ 'bad' if x.severity == 'error' else 'warn' }}">{{ 'Cannot be true' if x.severity == 'error' else 'Check' }} · Criterion {{ x.criteria }}</span></div>
+  <div class="small" style="margin-top:4px">{{ x.detail }}</div>
+  <div class="small" style="margin-top:6px"><b>What to do:</b> {{ x.fix }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+<h2 id="details">Item by item</h2>
+<p class="small muted" style="margin-top:-6px">How every mark was calculated, with the NBA formula and the numbers used.</p>
+{% for c in r.criteria if c['items'] %}
+<details class="card" id="c{{ c.number }}" style="padding:0" open>
+  <summary style="padding:16px 20px;list-style:none;display:flex;gap:14px;align-items:center;color:var(--ink)">
+    <span class="grade {{ c.grade or 'none' }}">{{ c.grade or '–' }}</span>
+    <b style="flex:1">Criterion {{ c.number }}: {{ c.name }}</b>
+    <span><b>{{ c.awarded }}</b> <span class="muted">/ {{ c.max }}</span></span><span class="muted">▾</span>
+  </summary>
+  <div style="padding:0 20px 14px">
+  {% for it in c['items'] %}
+  <div id="i{{ it.code }}" class="anchor" style="border-top:1px solid var(--line);padding:14px 0">
+    <div class="row between" style="flex-wrap:nowrap;align-items:flex-start">
+      <div><span class="pill blue">{{ it.code }}</span> <b>{{ it.title }}</b></div>
+      <span class="pill {{ 'ok' if it.awarded >= it.max else ('warn' if it.awarded > 0 else 'bad') }}" style="font-size:13px">{{ it.awarded }} / {{ it.max }}</span>
+    </div>
+    {% if it.window or it.evidence_file %}<p class="small muted" style="margin:6px 0">{% if it.window %}Years counted: {{ it.window }}{% endif %}{% if it.evidence_file %} · NBA file {{ it.evidence_file }}{% endif %}</p>{% endif %}
+    <ul class="small" style="margin:6px 0 0 18px;padding:0">{% for n in it.notes %}<li>{{ n }}</li>{% endfor %}</ul>
+    {% if it.findings %}
+    <div class="table-wrap" style="box-shadow:none;margin:10px 0 0">
+    <table class="small">
+      <tr><th>Status</th><th>Entry</th><th>Points</th><th>Why / what to do</th></tr>
+      {% for f in it.findings %}
+      <tr>
+        <td><span class="pill {{ 'ok' if f.status == 'accepted' else ('bad' if f.status == 'rejected' else 'warn') }}">{{ f.status }}</span></td>
+        <td>{{ f.person }}{% if f.person and f.title %} · {% endif %}{{ f.title }}{% if f.kind %} <span class="muted">({{ f.kind }})</span>{% endif %}{% if f.date %}<div class="muted">{{ f.date }}{% if f.year %} ({{ f.year }}){% endif %}</div>{% endif %}</td>
+        <td>{{ f.points }}</td>
+        <td>{% if f.reasons %}<ul class="reasons">{% for x in f.reasons %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+            {% if f.fixes %}<ul class="reasons">{% for x in f.fixes %}<li><strong>Do:</strong> {{ x }}</li>{% endfor %}</ul>{% endif %}
+            {% if not f.reasons and not f.fixes %}<span class="muted">All checks passed.</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table></div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  </div>
+</details>
+{% endfor %}
+
+{% if r.peer_team_questions %}
+<h2 id="questions">Questions the peer team may ask</h2>
+<div class="card"><ol style="margin:0;padding-left:20px">{% for q in r.peer_team_questions %}<li style="margin:6px 0">{{ q }}</li>{% endfor %}</ol></div>
+{% endif %}
+
+<h2>Previous audits</h2>
+<div class="table-wrap">
+<table>
+  <tr><th>Run at (UTC)</th><th>Marks</th><th></th></tr>
+  {% for h in history %}<tr><td>{{ h.run_at[:16] }}</td><td><b>{{ h.awarded }}</b> / {{ h.maximum }}</td>
+    <td style="text-align:right">{% if h.id != row.id %}<a href="{{ url_for('audit.report', program_id=p.id, audit_id=h.id) }}">Open</a>{% else %}<span class="pill blue">this report</span>{% endif %}</td></tr>{% endfor %}
+</table>
+</div>
+{% endblock %}

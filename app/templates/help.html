@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Help{% endblock %}
+{% block content %}
+{% set r = g.user.role %}
+<div class="hero">
+  <div class="eyebrow" style="color:#ffb27a">How to use CMRSARathi · Criterion 5</div>
+  <h1>Prepare Criterion 5 once, then audit it like an NBA peer team</h1>
+  <p class="sub" style="margin:0">Faculty Information, 100 marks: student-faculty ratio, faculty qualification, cadre, visiting faculty
+    and retention. No AI is used: every mark comes from the NBA formulas.</p>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">The flow in 5 steps</h2>
+  <ul class="steps">
+    <li><span class="tick todo">1</span><div class="txt"><b>Bring in the faculty list (Table B2.A)</b><span class="small muted">Faculty list › Import: an Excel/CSV export from the ERP, or add people one by one. Department and allied departments together.</span></div></li>
+    <li><span class="tick todo">2</span><div class="txt"><b>Type the few numbers that are not in the list</b><span class="small muted">Numbers (5.1–5.5): student strength S and DS from the ERP admissions data, and the pre-qualifier facts. Everything else is counted from the list.</span></div></li>
+    <li><span class="tick todo">3</span><div class="txt"><b>Upload the proofs</b><span class="small muted">On each person's page: the appointment letter and the highest degree certificate (PDF or phone photo). They are read with free OCR and checked at once.</span></div></li>
+    <li><span class="tick todo">4</span><div class="txt"><b>Add visiting faculty (5.4)</b><span class="small muted">Items &amp; documents › 5.4: fill Table 5.4.1 (year, name, course, hours). The yearly hours are added up for you.</span></div></li>
+    <li><span class="tick todo">5</span><div class="txt"><b>Run the audit and fix</b><span class="small muted">Marks for 5.1–5.5 with the working, marks if only checked proofs count, the faculty whose proofs to fix, pre-qualifiers and likely peer-team questions.</span></div></li>
+  </ul>
+</div>
+
+<h2>What each role does</h2>
+<div class="grid">
+  {% for key, title, items in [
+    ('principal', 'Principal', ['Creates programs and user accounts (Users).', 'Sees and edits every program; runs the audit.', 'Sees all programs side by side on the home page.']),
+    ('hod', 'HoD', ['Keeps the faculty list and the team of the program.', 'Edits everything in Criterion 5; runs the audit.', 'Downloads the Word report and the Criterion 5 SAR draft.']),
+    ('crit_head', 'Criteria head', ['Leads Criterion 5: faculty list, numbers, proofs.', 'Checks every flagged proof and gets it fixed.', 'Runs the audit after changes.']),
+    ('member', 'Criteria member', ['Adds faculty, numbers and proofs (phone camera works).', 'Sees the audit and the reasons, to know what to fix.', 'Does not run audits.']),
+    ('superadmin', 'Platform owner', ['Adds colleges and their principal login.', 'Manages subscriptions.', 'Sees no college data.'])
+  ] %}
+  <div class="card" style="{{ 'border:2px solid var(--primary)' if key == r }}">
+    <div class="row between"><b>{{ title }}</b>{% if key == r %}<span class="pill blue">You</span>{% endif %}</div>
+    <ul class="small" style="margin:8px 0 0 18px;padding:0">{% for it in items %}<li style="margin:4px 0">{{ it }}</li>{% endfor %}</ul>
+  </div>
+  {% endfor %}
+</div>
+
+<h2>Good to know</h2>
+<div class="card small">
+  <ul style="margin:0 0 0 18px;padding:0">
+    <li style="margin:5px 0"><b>Years:</b> Criterion 5 counts CAY, CAYm1 and CAYm2 (5.4 counts CAYm1 to CAYm3). A person counts in a year if they were on the rolls for at least 6 months of it.</li>
+    <li style="margin:5px 0"><b>Promotions and Ph.D.:</b> designation and degree are taken as on 1 January of each year, using the date of designation and the Ph.D. award date in the list.</li>
+    <li style="margin:5px 0"><b>Two sets of marks:</b> "as claimed" counts the whole list; "only checked proofs" counts only people whose appointment letter (and degree certificate for Ph.D./M.Tech) matched. The gap is what a strict peer team could cut.</li>
+    <li style="margin:5px 0"><b>Formulas</b> follow the NBA SAR format and Evaluation Guidelines (Tier I, 2026) and are tested against NBA's own worked examples. The NBA peer team takes the final decision.</li>
+  </ul>
+</div>
+{% endblock %}

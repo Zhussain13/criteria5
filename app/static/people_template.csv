@@ -1,0 +1,5 @@
+name,email,role,program,criteria
+Principal,principal@college.ac.in,principal,,
+HoD CSE,hod.cse@college.ac.in,hod,CSE,
+Criteria head C5,head.cse@college.ac.in,criteria head,CSE,5
+Criteria member C5,member.cse@college.ac.in,member,CSE,5

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}{{ p.name }}{% endblock %}
+{% block content %}
+{% set pct = (100 * last.awarded / last.maximum)|round|int if last and last.maximum else 0 %}
+<div class="hero">
+  <div class="row" style="gap:24px;align-items:center;position:relative;z-index:1">
+    <div class="ring" style="--p:{{ pct if last else prog.overall }};--c:{{ '#34b07f' if (last and pct >= 75) else '#f6a04d' }}">
+      <div>{% if last %}<b>{{ last.awarded|round(1) }}</b><span>of 100 marks</span>{% else %}<b>{{ prog.overall }}%</b><span>prepared</span>{% endif %}</div>
+    </div>
+    <div style="flex:1;min-width:240px">
+      <div class="eyebrow" style="color:#ffb27a">Criterion 5 · Faculty Information · {{ p.department }} · CAY {{ p.cay_start_year }}-{{ '%02d' % ((p.cay_start_year + 1) % 100) }}</div>
+      <h1 style="margin:4px 0">{{ p.name }}</h1>
+      {% if report %}
+        <p style="margin:4px 0 0;font-size:17px"><b>{{ report.award.status }}</b></p>
+        <p class="small" style="margin:4px 0 0;color:#dfe6f3">If the peer team accepts only checked proofs: <b>{{ report.verified_only.awarded }}</b> / 100
+          {% if report.verified_only.lost > 0 %}· <span style="color:#ffb27a">{{ report.verified_only.lost }} marks at risk</span>{% endif %}
+          · last audit {{ last.run_at[:16] }} UTC</p>
+      {% else %}<p class="muted" style="margin:4px 0 0">Not audited yet. Bring in the faculty list, type the student numbers, then run the audit.</p>{% endif %}
+      <p class="muted small" style="margin:6px 0 0">{{ rules_name }}{% if acc.manage_program %} · <a href="{{ url_for('programs.edit', program_id=p.id) }}">Edit program</a>{% endif %}</p>
+    </div>
+    <div class="row">
+      {% if option %}
+      <form method="post" action="{{ url_for('audit.run', program_id=p.id) }}" class="inline" title="{{ option.note }}">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <button class="accent lg" data-busy="Auditing…">▶ {{ option.label }}</button>
+      </form>
+      {% endif %}
+      {% if last %}<a class="btn secondary lg" href="{{ url_for('audit.report', program_id=p.id, audit_id=last.id) }}">View report</a>{% endif %}
+    </div>
+  </div>
+</div>
+<div class="card flat small" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+  <span><b>You:</b> {{ role_labels.get(acc.role, acc.role) }}</span>
+  <span><b>AI:</b> not used. Every mark comes from the NBA formulas; proofs are read with free OCR.</span>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="v">{{ prog.overall }}%</div><div class="k">Criterion 5 prepared</div><div class="bar" style="margin-top:8px"><span style="width:{{ prog.overall }}%"></span></div></div>
+  <div class="stat"><div class="v">{{ prog.counted }}</div><div class="k">faculty counted ({{ prog.faculty }} in the list)</div></div>
+  <div class="stat"><div class="v" style="color:{{ 'var(--ok)' if prog.proofs_needed and prog.missing_proofs == 0 else 'var(--warn)' }}">{{ prog.proofs_ok }}/{{ prog.proofs_needed }}</div><div class="k">faculty proofs checked</div></div>
+  <div class="stat"><div class="v">{{ prog.data_filled }}/{{ prog.data_cells }}</div><div class="k">numbers typed in</div></div>
+</div>
+
+{% if report %}
+<h2>Marks by item</h2>
+<div class="c5-items">
+  {% for it in report.criteria[0]['items'] %}
+  <a class="card" href="{{ url_for('audit.report', program_id=p.id, audit_id=last.id) }}#i{{ it.code }}">
+    <div class="tiny muted">{{ it.code }} · {{ it.title }}</div>
+    <div class="big">{{ it.awarded }} <span class="small muted" style="font-weight:500">/ {{ it.max }}</span></div>
+    <div class="bar {{ 'ok' if it.awarded >= 0.75 * it.max }}" style="margin-top:6px"><span style="width:{{ (100 * it.awarded / it.max)|round|int }}%"></span></div>
+    {% if it.awarded_verified < it.awarded %}<div class="tiny risk" style="margin-top:6px">{{ it.awarded_verified }} if only checked proofs count</div>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="cols split" style="margin-top:16px">
+  <div class="card">
+    <div class="row between"><h2 style="margin:0">Next steps</h2><span class="pill grey">{{ steps|selectattr('done')|list|length }} of {{ steps|length }} done</span></div>
+    <ul class="steps" style="margin-top:8px">
+      {% for s in steps %}
+      <li>
+        <span class="tick {{ 'done' if s.done else 'todo' }}">{{ '✓' if s.done else loop.index }}</span>
+        <div class="txt"><b style="{{ 'color:var(--muted);text-decoration:line-through' if s.done }}">{{ s.title }}</b><span class="small muted">{{ s.detail }}</span></div>
+        {% if s.audit and option %}
+          <form method="post" action="{{ url_for('audit.run', program_id=p.id) }}" class="inline"><input type="hidden" name="_csrf" value="{{ csrf_token }}">
+            <button class="sm {{ 'secondary' if s.done }}" data-busy="Auditing…">{{ 'Re-run' if s.done else 'Run' }}</button></form>
+        {% elif s.url %}<a class="btn sm {{ 'secondary' if s.done }}" href="{{ s.url }}">{{ s.cta }}</a>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">Assessment years</h2>
+    <p class="small muted" style="margin-top:-6px">Worked out from the CAY. Criterion 5 counts CAY, CAYm1 and CAYm2 (5.4 counts CAYm1 to CAYm3).</p>
+    <table class="small">
+      <tr><th>Name</th><th>Year</th><th>Period</th></tr>
+      {% for y in years %}<tr><td><b>{{ y.name }}</b></td><td>{{ y.label }}</td><td class="muted">{{ y['from'].strftime('%b %Y') }} – {{ y.to.strftime('%b %Y') }}</td></tr>{% endfor %}
+    </table>
+  </div>
+</div>
+
+<h2 id="team">Team</h2>
+<p class="small muted" style="margin-top:-6px">The principal sees every program automatically. HoDs, criteria heads and criteria members are added here.</p>
+<div class="table-wrap">
+<table>
+  <tr><th>Name</th><th>Login</th><th>Role</th><th></th></tr>
+  {% for m in members %}<tr><td><b>{{ m.name }}</b></td><td>{{ m.email }}</td><td><span class="pill blue">{{ role_labels.get(m.role, m.role) }}</span></td>
+    <td style="text-align:right">{% if acc.manage_team %}<form method="post" action="{{ url_for('programs.remove_member', program_id=p.id, uid=m.id) }}" class="inline">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="danger sm">Remove</button></form>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="4" class="muted center" style="padding:20px">No HoD or criteria team added yet.</td></tr>{% endfor %}
+</table>
+</div>
+{% if acc.manage_team %}
+<form method="post" action="{{ url_for('programs.add_member', program_id=p.id) }}" class="card">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <b>Add someone to the team</b>
+  <div class="row" style="gap:10px;margin-top:8px">
+    <select name="user_id" style="max-width:420px">{% for u in users %}<option value="{{ u.id }}">{{ u.name }} · {{ role_labels.get(u.role, u.role) }}</option>{% endfor %}</select>
+    <button>Add to team</button>
+  </div>
+  <p class="help">People are created by the principal under Users (roles: HoD, criteria head, criteria member).</p>
+</form>
+{% endif %}
+{% endblock %}

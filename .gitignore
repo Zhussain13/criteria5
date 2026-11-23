@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+instance/
+*.sqlite
+.env
+.pytest_cache/
+uploads/
+
+# SAR files with student data are not kept in git
+*SAR*2022*.pdf
+
+

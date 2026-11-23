@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit entry' if claim else 'New entry' }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('programs.detail', program_id=p.id) }}">{{ p.name }}</a> ›
+  <a href="{{ url_for('claims.list_claims', program_id=p.id, criterion=criterion) }}">Criterion {{ criterion }}</a> › {{ 'Edit entry' if claim else 'New entry' }}</div>
+<div class="page-head">
+  <div><div class="eyebrow">{{ 'Edit entry' if claim else 'New entry' }} · {{ item.max }} marks</div>
+    <h1>{{ code }} {{ item.title }}</h1>
+    <p class="sub" style="margin:4px 0 0">{% if item.window %}Counted years: {{ item.window|join(', ') }} · {% endif %}{% if item.evidence_file %}NBA document file {{ item.evidence_file }}{% endif %}</p></div>
+  {% if not claim %}
+  <form method="get" style="min-width:280px;max-width:420px;flex:1">
+    <label style="margin-top:0">Switch to another item</label>
+    <select name="item_code" onchange="this.form.submit()">
+      {% for k, it in items.items() %}<option value="{{ k }}" {{ 'selected' if k == code }}>{{ k }} {{ it.title }}</option>{% endfor %}
+    </select>
+  </form>
+  {% endif %}
+</div>
+{% if item.components and item.type == 'rubric' %}
+<div class="card flat" style="background:var(--primary-soft);border-color:#cfdcff">
+  <b>💡 What the NBA evaluators look for here</b>
+  <ul class="small" style="margin:6px 0 0 18px;padding:0">{% for c in item.components %}<li>{{ c.label }} <span class="muted">({{ c.marks }} marks)</span></li>{% endfor %}</ul>
+</div>
+{% endif %}
+<form method="post" class="card" enctype="multipart/form-data">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <input type="hidden" name="item_code" value="{{ code }}">
+  {% for f in fields %}
+    <label for="{{ f }}">{{ labels[f] }}</label>
+    {% if f == 'kind' %}
+      <select id="kind" name="kind" required>{% for k, lab in kinds %}<option value="{{ k }}" {{ 'selected' if form.get('kind') == k }}>{{ lab }}</option>{% endfor %}</select>
+    {% elif f == 'sar_text' %}
+      <p class="help" style="margin:0 0 6px">Write it like in Word: fonts, sizes, bold, alignment, lists, tables (merge cells from the Table menu), pictures. Paste from Word keeps the formatting.</p>
+      <textarea id="{{ f }}" name="{{ f }}" class="rich">{{ form.get(f, '') or '' }}</textarea>
+    {% elif f in ('start_date', 'end_date') %}
+      <input type="date" id="{{ f }}" name="{{ f }}" value="{{ form.get(f, '') or '' }}" {{ 'required' if f == 'start_date' }}>
+    {% elif f == 'amount' %}
+      <input type="number" step="0.01" min="0" id="{{ f }}" name="{{ f }}" value="{{ form.get(f, '') if form.get(f) is not none else '' }}" required>
+    {% else %}
+      <input type="text" id="{{ f }}" name="{{ f }}" value="{{ form.get(f, '') or '' }}" {{ 'required' if f == 'person_name' or (f == 'title' and item.type != 'rubric') }}>
+    {% endif %}
+  {% endfor %}
+
+  {% for t in tables %}
+  <div class="sar-table" data-t="{{ t.index }}">
+    <h3 style="margin:22px 0 4px">📋 Table No. {{ t.id }}: {{ t.title }}</h3>
+    {% if t.note %}<p class="small muted" style="margin:0 0 6px">{{ t.note }}</p>{% endif %}
+    {% for fname in t.fields %}
+      <label>{{ fname }}</label>
+      <input type="text" name="t{{ t.index }}_f{{ loop.index0 }}" value="{{ t.field_values.get(fname, '') }}">
+    {% endfor %}
+    {% if t.columns %}
+    <div class="table-wrap" style="box-shadow:none">
+    <table class="sartable">
+      <thead><tr>{% for col in t.columns %}<th>{{ col.name }}</th>{% endfor %}<th></th></tr></thead>
+      <tbody>
+      {% for row in t.form_rows %}{% set ri = loop.index0 %}
+        <tr>{% for col in t.columns %}{% set ci = loop.index0 %}<td>
+          {% if col.choices %}<select name="t{{ t.index }}_r{{ ri }}_c{{ ci }}"><option value=""></option>{% for ch in col.choices %}<option {{ 'selected' if row[ci] == ch }}>{{ ch }}</option>{% endfor %}</select>
+          {% else %}<input type="text" name="t{{ t.index }}_r{{ ri }}_c{{ ci }}" value="{{ row[ci] }}">{% endif %}
+        </td>{% endfor %}<td><button type="button" class="ghost sm" onclick="removeRow(this)" title="Remove row">✕</button></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <button type="button" class="secondary sm" style="margin-top:8px" onclick="addRow(this)">＋ Add row</button>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if not claim %}
+  <h3 style="margin-top:22px">Proof documents <span class="muted small" style="font-weight:400">(certificate, letter, report: PDF, PNG or JPG)</span></h3>
+  <label class="dropzone" id="dz"><span class="big">📎</span><b>Click to choose files</b> or drag and drop them here
+    <input type="file" name="proof" accept=".pdf,.png,.jpg,.jpeg" multiple onchange="showFiles(this)"><div class="files"></div></label>
+  <label class="btn secondary sm" style="margin-top:8px">📷 Scan with camera
+    <input type="file" name="proof" accept="image/*" capture="environment" multiple style="display:none" onchange="showFiles(this, true)"></label>
+  <p class="help">On a phone, "Scan with camera" opens the camera; each photo becomes a proof file. You can also attach proofs later. Entries without a proof get 0 marks.</p>
+  {% endif %}
+  <div class="form-actions">
+    <button class="lg" data-busy="Saving…">{{ 'Save changes' if claim else 'Save entry' }}</button>
+    {% if not claim and item.type != 'rubric' %}<button class="secondary lg" name="next" value="another" data-busy="Saving…">Save &amp; add another</button>{% endif %}
+    <a class="btn ghost" href="{{ url_for('claims.list_claims', program_id=p.id, criterion=criterion) }}">Cancel</a>
+  </div>
+</form>
+<style>
+  table.sartable { width: auto; min-width: 100%; }
+  table.sartable td { padding: 2px; min-width: 64px; }
+  table.sartable td:first-child { min-width: 180px; }
+  table.sartable input, table.sartable select { width: 100%; margin: 0; padding: 4px 6px; }
+  table.sartable th { font-size: .8rem; white-space: normal; }
+  .small-btn { padding: 2px 8px; }
+</style>
+<script>
+function showFiles(inp, camera) {
+  const box = camera ? document.querySelector('#dz .files') : inp.parentNode.querySelector('.files');
+  box.textContent = (camera ? '📷 ' : '') + [...inp.files].map(f => f.name).join(', ');
+}
+document.querySelectorAll('.dropzone').forEach(dz => {
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('over'); }));
+  dz.addEventListener('drop', e => { const inp = dz.querySelector('input'); inp.files = e.dataTransfer.files; showFiles(inp); });
+});
+function removeRow(btn) {
+  const tr = btn.closest('tr');
+  if (tr.parentNode.rows.length > 1) tr.remove(); else tr.querySelectorAll('[name]').forEach(e => e.value = '');
+}
+function addRow(btn) {
+  const box = btn.closest('.sar-table'), t = box.dataset.t, body = box.querySelector('tbody');
+  const last = body.querySelector('tr:last-child');
+  let max = -1;
+  body.querySelectorAll('[name]').forEach(e => { const m = e.name.match(/_r(\d+)_c/); if (m) max = Math.max(max, +m[1]); });
+  const tr = last.cloneNode(true), r = max + 1;
+  tr.querySelectorAll('[name]').forEach(e => { e.name = e.name.replace(/_r\d+_c/, '_r' + r + '_c'); e.value = ''; });
+  body.appendChild(tr);
+}
+</script>
+<script src="{{ url_for('static', filename='tinymce/tinymce.min.js') }}"></script>
+<script>
+{% set ds = (p.doc_settings | fromjson) if p.doc_settings else {} %}
+if (window.tinymce) tinymce.init({
+  selector: 'textarea.rich', height: 460, menubar: 'edit view insert format table tools',
+  promotion: false, branding: false, toolbar_mode: 'wrap', browser_spellcheck: true, contextmenu: false,
+  plugins: 'lists advlist table autoresize image link charmap searchreplace wordcount visualblocks fullscreen pagebreak',
+  toolbar: 'undo redo | fontfamily fontsize blocks | bold italic underline strikethrough forecolor backcolor | ' +
+           'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | ' +
+           'table tablemergecells tablesplitcells | image link | removeformat fullscreen',
+  font_family_formats: 'Times New Roman=times new roman,times; Arial=arial,helvetica,sans-serif; Calibri=calibri,sans-serif; Cambria=cambria,serif; Georgia=georgia,serif; Verdana=verdana,sans-serif; Courier New=courier new,courier',
+  font_size_formats: '8pt 9pt 10pt 11pt 12pt 14pt 16pt 18pt 24pt',
+  table_default_attributes: { border: '1' }, table_default_styles: { 'border-collapse': 'collapse', width: '100%' },
+  paste_data_images: true, automatic_uploads: false, images_file_types: 'jpeg,jpg,png,gif,webp',
+  content_style: "body { font-family: '{{ ds.get('font', 'Times New Roman') }}'; font-size: {{ ds.get('size', 12) }}pt; line-height: 1.5; } table td, table th { border: 1px solid #999; padding: 4px; }",
+  setup: ed => ed.on('change input', () => ed.save())
+});
+</script>
+{% endblock %}

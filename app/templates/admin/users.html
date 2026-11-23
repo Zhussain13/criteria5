@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<div class="eyebrow">Principal</div><h1>Users</h1>
+<p class="sub">Create accounts for {{ g.institution.name }}. The principal sees every program; HoDs, criteria heads and
+  criteria members are then added to a program's team (program page › Team).</p>
+<div class="card flat small">
+  <b>Who can do what</b>
+  <ul style="margin:6px 0 0 18px;padding:0">
+    <li><b>Principal</b>: creates programs and users; sees and edits every program; runs the audit.</li>
+    <li><b>HoD</b>: keeps the faculty list and team of their program; edits Criterion 5; runs the audit.</li>
+    <li><b>Criteria head</b>: leads Criterion 5 (faculty list, numbers, proofs); runs the audit.</li>
+    <li><b>Criteria member</b>: adds faculty, numbers and proofs; sees the results; runs no audits.</li>
+  </ul>
+</div>
+{% if created %}
+<div class="card" style="border-left:5px solid var(--ok)">
+  <b>New accounts: temporary passwords (shown only now)</b>
+  <p class="help">Copy or print this list and give each person their password privately.</p>
+  <div class="table-wrap" style="box-shadow:none"><table class="small">
+    <tr><th>Name</th><th>Email (login)</th><th>Role</th><th>Temporary password</th></tr>
+    {% for c in created %}<tr><td>{{ c.name }}</td><td>{{ c.email }}</td><td>{{ c.role }}</td><td><code>{{ c.password }}</code></td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endif %}
+<form method="post" action="{{ url_for('admin.import_users') }}" enctype="multipart/form-data" class="card">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <h2 style="margin-top:0">Import people (Excel / CSV)</h2>
+  <p class="small">Columns: <code>name, email, role, program, criteria</code>. Role: principal, hod, criteria head, member,
+    institute, admin. Program: the program name or department (e.g. <code>CSE</code>) for HoDs, criteria heads and members.
+    Criteria: e.g. <code>1,6</code>. <a href="{{ url_for('static', filename='people_template.csv') }}">Download the template</a>.</p>
+  <label class="dropzone" style="margin:0"><span class="big">⬆</span>Click or drop the Excel / CSV file
+    <input type="file" name="sheet" accept=".csv,.xlsx" required onchange="this.form.submit()"><div class="files"></div></label>
+</form>
+<div class="card">
+  <h2 style="margin-top:0">Add a user</h2>
+  <form method="post">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <div class="cols">
+      <div><label>Name</label><input type="text" name="name" required></div>
+      <div><label>Email</label><input type="email" name="email" required></div>
+    </div>
+    <label>Role</label>
+    <select name="role">{% for k, v in roles.items() %}<option value="{{ k }}">{{ v }}</option>{% endfor %}</select>
+    <p><button>Create user</button> <span class="muted small">A temporary password is shown once after creating.</span></p>
+  </form>
+</div>
+<div class="table-wrap"><table>
+  <tr><th>Name</th><th>Email</th><th>Role</th><th>Programs (criteria)</th><th></th></tr>
+  {% for u in users %}
+  <tr><td>{{ u.name }}</td><td>{{ u.email }}</td><td><span class="pill blue">{{ roles.get(u.role, u.role) }}</span></td><td class="small">{{ u.programs or ('All programs' if u.role == 'principal' else '–') }}</td>
+    <td><form method="post" action="{{ url_for('admin.reset', uid=u.id) }}" class="inline">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="secondary sm">Reset password</button></form></td></tr>
+  {% endfor %}
+</table></div>
+{% endblock %}

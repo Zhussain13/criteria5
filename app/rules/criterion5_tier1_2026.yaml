@@ -1,0 +1,83 @@
+# NBA rules: UG Engineering, Tier I, CRITERION 5 ONLY (Faculty Information, 100 marks)
+# Sources (all from NBA, copies in docs/nba/):
+#   - Evaluation Guidelines UG Engg Tier I (24-12-2025): marks of 5.1 to 5.5
+#   - SAR format UG Engg Tier I (28-04-2026): formulas and tables of Criterion 5
+#   - Annexure-I Pre-Qualifiers (28-04-2026): faculty conditions checked before a visit
+#
+# Years: CAY, CAYm1, CAYm2, CAYm3 (CAY = current academic year).
+# Data fields marked `auto: roster` are counted by the app from the faculty list (Table B2.A);
+# the rest are typed in once (from the ERP admissions data or the office).
+
+name: "UG Engineering - Tier I 2026: Criterion 5 Faculty Information"
+
+grade_bands: {Y: 75, C: 60, W: 40}
+
+# Award rules of Tier I (used for the faculty conditions; the full award needs all 9 criteria).
+award:
+  six_years:   {min_Y: 6, allow_W: 0, allow_D: 0, phd_pct_of_RF: 30, max_sfr: 20}
+  three_years: {min_Y: 3, allow_D: 0, phd_pct_of_RF: 20, max_sfr: 25}
+
+pre_qualifiers: true
+institute_criteria: []
+
+criteria:
+  5: {name: "Faculty Information", max: 100}
+
+data_fields:
+  - {key: S, criterion: 5, label: "S = Students of all UG+PG engg programs in Department + allied departments", years: [CAY, CAYm1, CAYm2]}
+  - {key: DS, criterion: 5, label: "DS = Students of all UG+PG engg programs in the Department alone", years: [CAY, CAYm1, CAYm2]}
+  - {key: F, criterion: 5, auto: roster, label: "F = Full-time faculty (regular/contractual) in Department + allied", years: [CAY, CAYm1, CAYm2]}
+  - {key: POP, criterion: 5, auto: roster, label: "PoP = Full-time Professors of Practice in Department + allied (counted up to 20% of required faculty)", years: [CAY, CAYm1, CAYm2]}
+  - {key: FF, criterion: 5, auto: roster, label: "FF = Faculty with 100% first-year teaching load", years: [CAY, CAYm1, CAYm2]}
+  - {key: SFR_SAR, criterion: 5, optional: true, label: "SFR as written in the SAR (optional: only to check the arithmetic)", years: [CAY, CAYm1, CAYm2]}
+  - {key: PHD, criterion: 5, auto: roster, label: "X = Faculty with Ph.D. (Department + allied)", years: [CAY, CAYm1, CAYm2]}
+  - {key: MTECH, criterion: 5, auto: roster, label: "Y = Faculty with M.Tech/M.E. (Department + allied)", years: [CAY, CAYm1, CAYm2]}
+  - {key: AF1, criterion: 5, auto: roster, label: "AF1 = Professors available (Department + allied)", years: [CAY, CAYm1, CAYm2]}
+  - {key: AF2, criterion: 5, auto: roster, label: "AF2 = Associate Professors available", years: [CAY, CAYm1, CAYm2]}
+  - {key: AF3, criterion: 5, auto: roster, label: "AF3 = Assistant Professors available", years: [CAY, CAYm1, CAYm2]}
+  - {key: AF, criterion: 5, auto: roster, label: "AF = Faculty available in the Department alone", years: [CAY, CAYm1, CAYm2]}
+  - {key: RET_A, criterion: 5, auto: roster, label: "A = Department faculty with < 1 year at this institute", years: [CAY, CAYm1, CAYm2]}
+  - {key: RET_B, criterion: 5, auto: roster, label: "B = Department faculty with 1-2 years", years: [CAY, CAYm1, CAYm2]}
+  - {key: RET_C, criterion: 5, auto: roster, label: "C = Department faculty with 2-3 years", years: [CAY, CAYm1, CAYm2]}
+  - {key: RET_D, criterion: 5, auto: roster, label: "D = Department faculty with 3-4 years", years: [CAY, CAYm1, CAYm2]}
+  - {key: RET_E, criterion: 5, auto: roster, label: "E = Department faculty with > 4 years", years: [CAY, CAYm1, CAYm2]}
+  - {key: ADJ_HOURS, criterion: 5, auto: visiting, label: "Visiting/adjunct/PoP (part-time) interaction hours (total of Table 5.4.1)", years: [CAYm1, CAYm2, CAYm3]}
+  - {key: HOD_PHD, criterion: 5, auto: roster, label: "HoD regular and holds Ph.D. (1 = yes, 0 = no)", years: [CAY]}
+  - {key: PROF_PHD, criterion: 5, auto: roster, label: "PQ: Professors with Ph.D., regular (Department + allied)", years: [CAY, CAYm1]}
+  - {key: ASSOC_PHD, criterion: 5, auto: roster, label: "PQ: Associate Professors with Ph.D., regular (Department + allied)", years: [CAY, CAYm1]}
+  - {key: OTHER_UG, criterion: 5, label: "PQ: Other UG (Engg) programs in Department + allied running 3+ years (N)", years: [CAY]}
+  - {key: APPROVAL_5Y, criterion: 5, label: "PQ: Competent-authority (AICTE) approval for the previous 5 years (1 = yes)", years: [CAY]}
+  - {key: BATCHES_PASSED, criterion: 5, label: "PQ: Number of batches passed out in the program", years: [CAY]}
+
+items:
+  "5.1":
+    criterion: 5
+    title: "Student-faculty ratio"
+    type: sfr
+    max: 30
+    evidence_file: P.21
+    years: [CAY, CAYm1, CAYm2]
+    bands:
+      - {below: 15, marks: 30}
+      - {below: 17, marks: 27}
+      - {below: 19, marks: 24}
+      - {below: 21, marks: 21}
+      - {below: 23, marks: 18}
+      - {below: 25, marks: 15}
+  "5.2": {criterion: 5, title: "Faculty qualification", type: fqi, max: 25, evidence_file: P.21, years: [CAY, CAYm1, CAYm2]}
+  "5.3": {criterion: 5, title: "Faculty cadre proportion", type: cadre, max: 25, evidence_file: P.21, years: [CAY, CAYm1, CAYm2]}
+  "5.4": {criterion: 5, title: "Visiting/adjunct faculty/professor of practice", type: adjunct, max: 10, evidence_file: P.21,
+          years: [CAYm1, CAYm2, CAYm3], provision_marks: 1, hours_needed: 50, marks_per_year: 3}
+  "5.5": {criterion: 5, title: "Faculty retention", type: retention, max: 10, evidence_file: P.21, years: [CAY, CAYm1, CAYm2]}
+
+tables:
+  "5.4":
+    - id: "5.4.1"
+      title: "List of visiting/adjunct faculty/professor of practice and their teaching and practical loads"
+      columns:
+        - {name: "Year", choices: [CAYm1, CAYm2, CAYm3]}
+        - "Name of the person"
+        - "Designation & organization"
+        - "Name of the course"
+        - "No. of hours handled"
+      note: "Part-time or hourly contributors only (no repetition from 5.1). The yearly total hours are added up by the app."

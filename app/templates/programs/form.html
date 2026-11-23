@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if program else 'New' }} program{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('index') }}">Programs</a> › {{ 'Edit' if program else 'New' }}</div>
+<div class="eyebrow">{{ 'Edit program' if program else 'Step 1 of 1' }}</div>
+<h1>{{ 'Edit program' if program else 'Create a program' }}</h1>
+<p class="sub">Most fields are filled for CMRIT already. The current academic year (CAY) decides which years are counted; everything else is worked out from it.</p>
+<form method="post" class="card" style="max-width:760px">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <label>Program name</label>
+  <input type="text" name="name" required value="{{ program.name if program else 'B.E. Computer Science and Engineering' }}">
+  <div class="cols">
+    <div><label>Department</label><input type="text" name="department" required value="{{ program.department if program else 'CSE' }}"></div>
+    <div><label>Tier</label>
+      <select name="tier"><option>Tier I</option></select></div>
+  </div>
+  <label>Institute name and short names (comma-separated)</label>
+  <input type="text" name="institute_name" required value="{{ program.institute_name if program else 'CMR Institute of Technology, CMRIT' }}">
+  <p class="help">Appointment letters must show one of these names.</p>
+  <label>NBA rules</label>
+  <select name="sar_version">{% for k, v in versions.items() %}<option value="{{ k }}" {{ 'selected' if program and program.sar_version == k }}>{{ v }}</option>{% endfor %}</select>
+  <div class="cols">
+    <div><label>CAY start year</label>
+      <input type="number" name="cay_start_year" required min="2000" max="2100" value="{{ program.cay_start_year if program else this_year }}">
+      <p class="help">e.g. 2025 for CAY 2025-26 (assessment years 2024-25, 2023-24, 2022-23)</p></div>
+    <div><label>Academic year starts in month</label>
+      <input type="number" name="ay_start_month" min="1" max="12" value="{{ program.ay_start_month if program else 7 }}">
+      <p class="help">7 = July</p></div>
+  </div>
+  <div class="form-actions"><button class="lg">{{ 'Save changes' if program else 'Create program' }}</button> <a class="btn ghost" href="{{ url_for('index') }}">Cancel</a></div>
+</form>
+{% endblock %}

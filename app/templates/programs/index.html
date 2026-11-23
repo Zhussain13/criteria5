@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Programs{% endblock %}
+{% block content %}
+<div class="hero">
+  <div class="eyebrow" style="color:#ffb27a">{{ g.institution.name if g.institution else '' }} · {{ {'principal':'Principal','hod':'HoD','crit_head':'Criteria head','member':'Criteria member'}.get(g.user.role, g.user.role) }}</div>
+  <h1>Hello, {{ g.user.name.split('(')[0].strip() if g.user.name else '' }}</h1>
+  <p class="sub" style="margin:0">Criterion 5 (Faculty Information, 100 marks): the faculty list, the NBA formulas and a proof check
+    of every appointment letter and degree certificate, with no AI.</p>
+</div>
+
+{% if overview and programs %}
+<div class="stats">
+  <div class="stat"><div class="v">{{ programs|length }}</div><div class="k">programs</div></div>
+  <div class="stat"><div class="v">{{ (stats.values()|sum(attribute='progress') / programs|length)|round|int }}%</div><div class="k">average Criterion 5 prepared</div></div>
+  <div class="stat"><div class="v">{{ stats.values()|sum(attribute='counted') }}</div><div class="k">faculty counted</div></div>
+  <div class="stat"><div class="v">{{ stats.values()|selectattr('last')|list|length }}</div><div class="k">programs audited</div></div>
+</div>
+{% endif %}
+<div class="page-head">
+  <h2 style="margin:0">{{ programs|length }} program{{ '' if programs|length == 1 else 's' }}</h2>
+  {% if g.user.role in ('principal', 'hod') %}<a class="btn accent" href="{{ url_for('programs.create') }}">＋ New program</a>{% endif %}
+</div>
+{% if not programs %}
+  <div class="card center" style="padding:40px">
+    <div style="font-size:40px">📂</div>
+    <h2 style="margin:8px 0">No programs yet</h2>
+    <p class="muted">{% if g.user.role in ('principal','hod') %}Create the first one, for example "B.E. Computer Science and Engineering".{% else %}Ask your HoD or principal to add you to a program's team.{% endif %}</p>
+    {% if g.user.role in ('principal','hod') %}<a class="btn accent" href="{{ url_for('programs.create') }}">＋ Create a program</a>{% endif %}
+  </div>
+{% endif %}
+<div class="grid">
+  {% for p in programs %}{% set s = stats[p.id] %}
+  <a class="card" href="{{ url_for('programs.detail', program_id=p.id) }}">
+    <div class="row between" style="align-items:flex-start;flex-wrap:nowrap">
+      <div>
+        <span class="pill blue">Criterion 5 · {{ p.tier }}</span>
+        <h3 style="margin:10px 0 2px">{{ p.name }}</h3>
+        <div class="muted small">{{ p.department }} · CAY {{ p.cay_start_year }}-{{ '%02d' % ((p.cay_start_year + 1) % 100) }}</div>
+      </div>
+      {% if s.last %}<div class="ring light" style="--p:{{ s.pct }};--c:{{ '#16865a' if s.pct >= 75 else ('#2f5bea' if s.pct >= 60 else '#e8742a') }};width:72px;height:72px">
+        <div style="width:54px;height:54px"><b style="font-size:15px">{{ s.last.awarded|round|int }}</b></div></div>{% endif %}
+    </div>
+    <div style="margin-top:16px">
+      <div class="row between small"><span>Criterion 5 prepared</span><b>{{ s.progress }}%</b></div>
+      <div class="bar" style="margin-top:6px"><span style="width:{{ s.progress }}%"></span></div>
+    </div>
+    <div class="row between small muted" style="margin-top:12px">
+      <span>{{ s.counted }} faculty · {{ s.proofs_ok }}/{{ s.proofs_needed }} proofs checked</span>
+      <span>{% if s.last %}{{ s.last.awarded|round(1) }} / 100{% else %}Not audited yet{% endif %}</span>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Criterion 5{% endblock %} · CMRSARathi C5</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23e8742a'/><text x='16' y='22' font-size='18' font-family='Arial' font-weight='700' fill='white' text-anchor='middle'>S</text></svg>">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="{{ url_for('index') }}"><span class="logo">S</span>
+    <span>CMRSARathi · Criterion 5<small>{{ g.institution.short_name or g.institution.name if g.get('institution') else 'NBA Faculty Information: preparation and audit' }}</small></span></a>
+  {% if g.user %}
+  <nav class="top">
+    <a href="{{ url_for('index') }}">Programs</a>
+    {% if g.user.role == 'admin' %}<a href="{{ url_for('admin.users') }}" class="hide-sm">Users</a>{% endif %}
+    {% if g.user.role != 'superadmin' %}<a href="{{ url_for('programs.help_page') }}">Help</a>{% endif %}
+    {% if g.user.role == 'superadmin' %}<a href="{{ url_for('platform.institutions') }}">Institutions</a>{% endif %}
+    <a href="{{ url_for('auth.password') }}" title="Change password"><span class="avatar">{{ g.user.name[:1] }}</span><span class="hide-sm">{{ g.user.name }}</span></a>
+    <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <button class="link" style="color:#dfe6f3;padding:7px 10px">Log out</button>
+    </form>
+  </nav>
+  {% endif %}
+</header>
+{% block shell %}
+<div class="shell {{ '' if nav_program else 'no-side' }}">
+  {% if nav_program %}{% set np = nav_progress %}
+  <aside class="side">
+    <div class="prog">
+      <div class="tiny muted">Program</div>
+      <strong>{{ nav_program.name }}</strong>
+      <div class="bar" style="margin-top:8px"><span style="width:{{ np.overall }}%"></span></div>
+      <div class="tiny muted" style="margin-top:4px">{{ np.overall }}% of Criterion 5 prepared</div>
+    </div>
+    <a href="{{ url_for('programs.detail', program_id=nav_program.id) }}" class="{{ 'active' if nav_endpoint == 'programs.detail' }}"><span class="ico">🏠</span> Dashboard</a>
+    {% if np.last %}<a href="{{ url_for('audit.report', program_id=nav_program.id, audit_id=np.last.id) }}" class="{{ 'active' if nav_endpoint == 'audit.report' }}"><span class="ico">📊</span> Audit report</a>{% endif %}
+    {% if 5 in nav_view %}
+    <div class="label">Criterion 5 · Faculty Information</div>
+    <a href="{{ url_for('faculty.list_faculty', program_id=nav_program.id) }}" class="{{ 'active' if nav_endpoint and nav_endpoint.startswith('faculty.') }}"><span class="ico">👥</span> Faculty list (B2.A)</a>
+    <a href="{{ url_for('claims.data_sheet', program_id=nav_program.id, criterion=5) }}" class="{{ 'active' if nav_endpoint == 'claims.data_sheet' }}"><span class="ico">🧮</span> Numbers (5.1–5.5)</a>
+    <a href="{{ url_for('claims.list_claims', program_id=nav_program.id, criterion=5) }}" class="{{ 'active' if nav_endpoint in ('claims.list_claims', 'claims.new_claim', 'claims.detail', 'claims.edit_claim') }}"><span class="ico">📝</span> Items &amp; documents</a>
+    <div class="label">More</div>
+    <a href="{{ url_for('library.sar_document', program_id=nav_program.id) }}" class="{{ 'active' if nav_endpoint == 'library.sar_document' }}"><span class="ico">📄</span> SAR document</a>
+    <a href="{{ url_for('library.proofs', program_id=nav_program.id) }}" class="{{ 'active' if nav_endpoint == 'library.proofs' }}"><span class="ico">📎</span> Other proofs</a>
+    {% endif %}
+    <a href="{{ url_for('programs.detail', program_id=nav_program.id) }}#team"><span class="ico">🧑‍🤝‍🧑</span> Team</a>
+  </aside>
+  {% endif %}
+  <main>
+    {% for cat, msg in get_flashed_messages(with_categories=true) %}
+      <div class="flash {{ cat }}">{{ msg }}</div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% endblock %}
+<footer>CMRSARathi · Criterion 5 pilot · CMR Institute of Technology, Bengaluru · NBA formulas, no AI · the NBA peer team takes the final decision.</footer>
+<script>
+  // Show "working" on slow buttons (audit, uploads) so nobody clicks twice.
+  document.addEventListener('submit', e => {
+    const b = e.target.querySelector('button[data-busy]');
+    if (b) { b.classList.add('busy'); b.textContent = b.dataset.busy; }
+  });
+</script>
+</body>
+</html>

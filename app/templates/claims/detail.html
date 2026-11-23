@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Entry{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('programs.detail', program_id=p.id) }}">{{ p.name }}</a> ›
+  <a href="{{ url_for('claims.list_claims', program_id=p.id, criterion=criterion) }}">Criterion {{ criterion }}</a> › Entry</div>
+<div class="page-head">
+  <div><div class="eyebrow">{{ c.item_code }} · {{ item.max }} marks</div><h1>{{ c.title or item.title }}</h1>
+    <p class="sub" style="margin:4px 0 0">{{ item.title }}</p></div>
+  <div class="actions">
+    {% if proofs %}<span class="pill ok" style="padding:6px 12px">📎 {{ proofs|length }} proof{{ 's' if proofs|length > 1 }}</span>{% else %}<span class="pill bad" style="padding:6px 12px">No proof yet: 0 marks</span>{% endif %}
+    {% if can_edit %}<a class="btn secondary" href="{{ url_for('claims.edit_claim', program_id=p.id, criterion=criterion, claim_id=c.id) }}">✏ Edit{{ ' entry and tables' if tables }}</a>
+    <a class="btn" href="{{ url_for('claims.new_claim', program_id=p.id, criterion=criterion, item_code=c.item_code) }}">＋ Add another</a>{% endif %}
+  </div>
+</div>
+
+<div class="cols split">
+<div>
+  <div class="card">
+    <h2 style="margin-top:0">Details</h2>
+    <table>
+      {% for f in fields %}{% if c[f] %}<tr><th style="width:38%">{{ labels[f] }}</th><td style="white-space:pre-wrap">{% if f == 'kind' %}{{ kinds.get(c.kind, c.kind) }}{% else %}{{ c[f] }}{% endif %}</td></tr>{% endif %}{% endfor %}
+    </table>
+    {% for t in tables %}
+      <h3 style="margin:20px 0 6px">📋 Table No. {{ t.id }}: {{ t.title }}</h3>
+      {% if t.saved %}
+        {% for k, v in t.saved.fields.items() %}<p class="small" style="margin:2px 0"><strong>{{ k }}:</strong> {{ v }}</p>{% endfor %}
+        {% if t.columns and t.saved.rows %}<div class="table-wrap" style="box-shadow:none"><table class="small">
+          <tr>{% for col in t.columns %}<th>{{ col.name }}</th>{% endfor %}</tr>
+          {% for row in t.saved.rows %}<tr>{% for v in row %}<td>{{ v }}</td>{% endfor %}</tr>{% endfor %}
+        </table></div>{% endif %}
+      {% else %}<p class="small"><span class="pill warn">Not filled</span> The SAR format asks for this table.
+        {% if can_edit %}<a href="{{ url_for('claims.edit_claim', program_id=p.id, criterion=criterion, claim_id=c.id) }}">Fill it now →</a>{% endif %}</p>{% endif %}
+    {% endfor %}
+  </div>
+  {% if can_edit %}
+  <form method="post" action="{{ url_for('claims.delete_claim', program_id=p.id, criterion=criterion, claim_id=c.id) }}"
+        onsubmit="return confirm('Delete this entry and its proofs?')">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="danger sm">Delete entry</button></form>
+  {% endif %}
+</div>
+
+<div>
+  <h2 style="margin-top:0">Proofs</h2>
+  {% if can_edit %}
+  <form method="post" action="{{ url_for('claims.upload_proof', program_id=p.id, criterion=criterion, claim_id=c.id) }}" enctype="multipart/form-data" style="margin-bottom:14px">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <label class="dropzone" style="margin:0"><span class="big">📎</span><b>Add proof files</b><br><span class="small">Click or drop PDF / PNG / JPG (uploads at once)</span>
+      <input type="file" name="proof" accept=".pdf,.png,.jpg,.jpeg" multiple onchange="this.closest('label').querySelector('.files').textContent='Uploading…';this.form.submit()"><div class="files"></div></label>
+    <label class="btn secondary sm" style="margin-top:8px;width:100%">📷 Scan with camera
+      <input type="file" name="proof" accept="image/*" capture="environment" multiple style="display:none" onchange="this.form.submit()"></label>
+  </form>
+  {% endif %}
+  {% for pr in proofs %}
+  <div class="card" style="padding:14px 16px">
+    <div class="row between" style="flex-wrap:nowrap">
+      <a href="{{ url_for('claims.view_proof', program_id=p.id, criterion=criterion, claim_id=c.id, proof_id=pr.id) }}" style="overflow:hidden;text-overflow:ellipsis"><b>📄 {{ pr.original_name }}</b></a>
+      {% if can_edit %}<form method="post" action="{{ url_for('claims.delete_proof', program_id=p.id, criterion=criterion, claim_id=c.id, proof_id=pr.id) }}" class="inline">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="danger sm">Remove</button></form>{% endif %}
+    </div>
+    <div class="row small" style="gap:6px;margin-top:8px">
+      {% if pr.extracted.start_date %}<span class="pill ok">📅 {{ pr.extracted.start_date }}{% if pr.extracted.end_date and pr.extracted.end_date != pr.extracted.start_date %} → {{ pr.extracted.end_date }}{% endif %}</span>{% else %}<span class="pill warn">No date found</span>{% endif %}
+      {% if pr.extracted.duration_days %}<span class="pill blue">{{ pr.extracted.duration_days }} days</span>{% endif %}
+      {% if pr.extracted.doi %}<span class="pill blue">DOI {{ pr.extracted.doi }}</span>{% endif %}
+      {% if pr.extracted.read_by == 'ai' %}<span class="pill grey">read with AI</span>{% endif %}
+    </div>
+    <details style="margin-top:8px"><summary class="small">Text read from the proof</summary><pre class="ocr">{{ pr.ocr_text or '(no text could be read)' }}</pre></details>
+  </div>
+  {% else %}<div class="card flat center muted" style="padding:24px">No proof attached yet. This entry gets 0 marks until one is added.</div>{% endfor %}
+</div>
+</div>
+<script>
+document.querySelectorAll('.dropzone').forEach(dz => {
+  ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('over'); }));
+  dz.addEventListener('drop', e => { const inp = dz.querySelector('input'); inp.files = e.dataTransfer.files; inp.dispatchEvent(new Event('change')); });
+});
+</script>
+{% endblock %}

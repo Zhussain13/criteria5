@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Data sheet · Criterion {{ criterion }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('programs.detail', program_id=p.id) }}">{{ p.name }}</a> ›
+  <a href="{{ url_for('claims.list_claims', program_id=p.id, criterion=criterion) }}">Criterion {{ criterion }}</a> › Data sheet</div>
+<div class="page-head">
+  <div><div class="eyebrow">Data sheet · Criterion {{ criterion }}</div><h1>{{ crit.name }}</h1>
+    <p class="sub" style="margin:4px 0 0">Blue rows are counted by the app from the <a href="{{ url_for('faculty.list_faculty', program_id=p.id) }}">faculty list</a>.
+      You only type the student numbers (S, DS, from the ERP admissions data) and the pre-qualifier facts.</p></div>
+  <div class="stat" style="min-width:170px;padding:12px 16px"><div class="v" id="filledCount">0</div><div class="k">of <span id="totalCount">0</span> numbers entered</div></div>
+</div>
+<div class="card flat small" style="background:var(--primary-soft);border-color:#cfdcff">
+  💡 Leave a cell empty if it does not apply (empty counts as 0, as an evaluator would). To change a blue number,
+  correct the faculty list: the number updates by itself. Press <b>Tab</b> to move to the next cell.
+</div>
+<form method="post">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+  <div class="table-wrap">
+  <table class="sheet">
+    <tr><th style="min-width:300px">Item</th>
+      {% for h in headers %}<th class="center">{{ h.display }}<div style="font-weight:500;text-transform:none;letter-spacing:0">{{ h.label }}</div></th>{% endfor %}</tr>
+    {% for f in fields %}
+    <tr>
+      <td class="small">{% if f.label.split(" ")[0] != f.key and not f.label.startswith(f.key) %}<strong>{{ f.key }}</strong> · {% endif %}{{ f.label }}
+        {% if f.auto == 'roster' %}<span class="pill blue">from faculty list</span>{% elif f.auto == 'visiting' %}<span class="pill grey">from Table 5.4.1 if filled</span>{% endif %}</td>
+      {% for h in headers %}
+        <td class="center">{% if h.name in f.years %}
+          {% set v = values.get((f.key, h.name)) %}
+          {% if f.auto == 'roster' or (f.key, h.name) in auto %}
+          <span class="auto-val" title="Counted by the app from {{ 'the faculty list' if f.auto == 'roster' else 'Table 5.4.1' }}"><b>{{ ('%g' % v) if v is not none else '0' }}</b></span>
+          {% else %}
+          <input type="number" step="any" min="0" name="{{ f.key }}__{{ h.name }}" class="{{ 'filled' if v is not none }}"
+                 value="{{ ('%g' % v) if v is not none else '' }}" {{ 'disabled' if not can_edit }}>
+          {% endif %}
+        {% else %}<span class="muted">–</span>{% endif %}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </table>
+  </div>
+  {% if can_edit %}<div class="form-actions" style="background:linear-gradient(transparent, var(--bg) 30%)">
+    <button class="lg" data-busy="Saving…">💾 Save data</button>
+    <a class="btn ghost" href="{{ url_for('claims.list_claims', program_id=p.id, criterion=criterion) }}">Back to criterion</a>
+  </div>{% endif %}
+</form>
+<p class="small muted">Appointment letters and degree certificates go on each person's page in the faculty list. Other documents (student strength, AICTE approvals, visiting faculty) go under the items of Criterion 5.</p>
+<script>
+  const cells = [...document.querySelectorAll('.sheet input[type=number]')];
+  function count() {
+    document.getElementById('filledCount').textContent = cells.filter(c => c.value !== '').length;
+    document.getElementById('totalCount').textContent = cells.length;
+  }
+  cells.forEach(c => c.addEventListener('input', () => { c.classList.toggle('filled', c.value !== ''); count(); }));
+  count();
+</script>
+{% endblock %}

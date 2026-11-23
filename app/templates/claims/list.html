@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Criterion {{ criterion }}{% endblock %}
+{% block content %}
+{% set cp = nav_progress.criteria[criterion] if nav_progress else none %}
+<div class="crumbs"><a href="{{ url_for('programs.detail', program_id=p.id) }}">{{ p.name }}</a> › Criterion {{ criterion }}</div>
+<div class="page-head">
+  <div>
+    <div class="eyebrow">Criterion {{ criterion }} · {{ crit.max }} marks</div>
+    <h1>{{ crit.name }}</h1>
+    {% if cp %}<div class="row small muted" style="margin-top:6px"><div class="bar" style="width:180px"><span style="width:{{ cp.pct }}%"></span></div> {{ cp.pct }}% prepared · {{ cp.entries }} entries{% if cp.no_proof %} · <span style="color:var(--bad)">{{ cp.no_proof }} without proof</span>{% endif %}</div>{% endif %}
+  </div>
+  <div class="actions">
+    {% if option %}<form method="post" action="{{ url_for('audit.run', program_id=p.id) }}" class="inline" title="{{ option.note }}">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}"><input type="hidden" name="back" value="{{ request.path }}">
+      <button class="accent" data-busy="Starting…" {{ 'disabled' if job }}>{{ '⏳ Audit running…' if job else '▶ ' ~ option.label }}</button></form>{% endif %}
+    {% if has_data %}<a class="btn {{ 'accent' if cp and cp.data_filled < cp.data_cells else 'secondary' }}" href="{{ url_for('claims.data_sheet', program_id=p.id, criterion=criterion) }}">🧮 Data sheet{% if cp %} · {{ cp.data_filled }}/{{ cp.data_cells }}{% endif %}</a>{% endif %}
+  </div>
+</div>
+{% if job %}<meta http-equiv="refresh" content="15"><div class="card" style="display:flex;gap:12px;align-items:center"><div class="spinner"></div><span class="small"><b>Audit running…</b> the page refreshes by itself.</span></div>{% endif %}
+{% if not can_edit %}<div class="flash error">You can view this criterion but not edit it.</div>{% endif %}
+<div class="row" style="gap:8px;margin-bottom:14px">
+  <a class="btn secondary sm" href="{{ url_for('library.sar_document', program_id=p.id, c=criterion) }}">📄 SAR document of Criterion {{ criterion }}</a>
+  <a class="btn secondary sm" href="{{ url_for('library.proofs', program_id=p.id, c=criterion) }}">📎 Proofs of Criterion {{ criterion }}</a>
+</div>
+{% if team and acc.role in ('crit_head', 'hod', 'principal') %}
+<details class="card" style="padding:14px 18px" {{ 'open' if acc.role == 'crit_head' }}>
+  <summary><b>Team progress</b> <span class="small muted">· what each member has added to Criterion {{ criterion }}</span></summary>
+  <div class="table-wrap" style="box-shadow:none;margin:10px 0 0">
+  <table class="small">
+    <tr><th>Member</th><th>Role</th><th>Entries</th><th>Sections written</th><th>Proof files</th><th>Last update</th></tr>
+    {% for t in team %}<tr><td><b>{{ t.name }}</b></td><td>{{ 'Criteria head' if t.role == 'crit_head' else 'Member' }}</td>
+      <td>{{ t.entries }}</td><td>{{ t.written }}</td><td>{{ t.proofs }}</td>
+      <td>{{ t.last[:16] if t.last else '' }}{% if not t.last %}<span class="pill warn">nothing yet</span>{% endif %}</td></tr>{% endfor %}
+  </table></div>
+</details>
+{% endif %}
+
+{% for code, item in items.items() %}
+{% set mine = claims | selectattr('item_code', 'equalto', code) | list %}
+{% set noproof = mine | selectattr('n_proofs', 'equalto', 0) | list %}
+{% set is_data = item.type in data_types %}
+<div class="item" id="item-{{ code }}">
+  <div class="item-head">
+    <span class="code">{{ code }}</span>
+    <div class="t"><b>{{ item.title }}</b>
+      <span class="small muted">{{ item.max }} marks{% if item.window %} · counted years {{ item.window|join(', ') }}{% endif %}{% if item.evidence_file %} · NBA file {{ item.evidence_file }}{% endif %}</span></div>
+    {% if is_data %}<span class="pill blue">From data sheet</span>
+    {% elif not mine %}<span class="pill grey">Not started</span>
+    {% elif noproof %}<span class="pill warn">{{ noproof|length }} without proof</span>
+    {% else %}<span class="pill ok">✓ {{ mine|length }} entr{{ 'y' if mine|length == 1 else 'ies' }}</span>{% endif %}
+    {% if can_edit %}
+      {% if is_data %}<a class="btn sm secondary" href="{{ url_for('claims.data_sheet', program_id=p.id, criterion=criterion) }}">Enter numbers</a>{% endif %}
+      <a class="btn sm {{ 'secondary' if mine or is_data }}" href="{{ url_for('claims.new_claim', program_id=p.id, criterion=criterion, item_code=code) }}">＋ {{ 'Add document' if is_data else ('Add another' if mine else 'Add entry') }}</a>
+    {% endif %}
+  </div>
+  {% if mine %}
+  <div class="item-body">
+    {% for c in mine %}
+    <div class="entry">
+      <div class="who"><a href="{{ url_for('claims.detail', program_id=p.id, criterion=criterion, claim_id=c.id) }}"><b>{{ c.title or (c.sar_text[:70] ~ ('…' if c.sar_text|length > 70 else '')) or 'Entry ' ~ c.id }}</b></a>
+        <div class="small muted">{{ c.person_name or '' }}{% if c.person_name and c.start_date %} · {% endif %}{{ c.start_date or '' }}{% if c.end_date and c.end_date != c.start_date %} → {{ c.end_date }}{% endif %}{% if c.kind %} · {{ c.kind }}{% endif %}</div></div>
+      {% if c.n_proofs %}<span class="pill ok">📎 {{ c.n_proofs }} proof{{ 's' if c.n_proofs > 1 }}</span>{% else %}<span class="pill bad">No proof</span>{% endif %}
+      <a class="btn ghost sm" href="{{ url_for('claims.detail', program_id=p.id, criterion=criterion, claim_id=c.id) }}">Open →</a>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

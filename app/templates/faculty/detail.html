@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}{{ f.name }}{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('programs.detail', program_id=p.id) }}">{{ p.name }}</a> ›
+  <a href="{{ url_for('faculty.list_faculty', program_id=p.id) }}">Faculty list</a> › {{ f.name }}</div>
+<div class="page-head">
+  <div><div class="eyebrow">{{ f.department or p.department }}{% if f.allied %} · allied department{% endif %}{% if f.is_hod %} · HoD{% endif %}</div>
+    <h1>{{ f.name }}</h1>
+    <p class="sub" style="margin:4px 0 0">{{ f.designation }} · {{ f.qualification }} · {{ f.nature }}{% if not f.full_time %} · part-time{% endif %}</p></div>
+  {% if can_edit %}<div class="actions">
+    <a class="btn secondary" href="{{ url_for('faculty.edit', program_id=p.id, fid=f.id) }}">✎ Edit details</a>
+    <form method="post" action="{{ url_for('faculty.delete', program_id=p.id, fid=f.id) }}" class="inline" onsubmit="return confirm('Remove {{ f.name }} from the faculty list?')">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="danger">Remove</button></form></div>{% endif %}
+</div>
+
+<div class="cols split">
+  <div class="card">
+    <h2 style="margin-top:0">Details (Table B2.A)</h2>
+    <table class="small">
+      <tr><th>Date of joining</th><td>{{ f.joining_date or '–' }}</td></tr>
+      <tr><th>Date of leaving</th><td>{{ f.leaving_date or 'Still working' }}</td></tr>
+      <tr><th>Designation at joining</th><td>{{ f.designation_at_joining or f.designation }}</td></tr>
+      <tr><th>Present designation</th><td>{{ f.designation }}{% if f.designated_on %} (since {{ f.designated_on }}){% endif %}</td></tr>
+      <tr><th>Highest degree</th><td>{{ f.qualification }}{% if f.phd_date %} (awarded {{ f.phd_date }}){% endif %}{% if f.university %}, {{ f.university }}{% endif %}</td></tr>
+      <tr><th>Specialization</th><td>{{ f.specialization or '–' }}</td></tr>
+      <tr><th>First-year load</th><td>{{ '100% first year (counted in FF)' if f.first_year else 'No' }}</td></tr>
+      {% if f.apaar_id %}<tr><th>APAAR ID</th><td>{{ f.apaar_id }}</td></tr>{% endif %}
+    </table>
+  </div>
+  <div class="card">
+    <h2 style="margin-top:0">How this person is counted</h2>
+    <table class="small">
+      <tr><th>Year</th><th>Counted</th><th>Cadre</th><th>Degree</th></tr>
+      {% for y in years %}<tr><td><b>{{ y.name }}</b> <span class="muted">{{ y.label }}</span></td>
+        <td>{{ '✓ yes' if pres.years[y.name] else '– no' }}</td>
+        <td>{{ pres.cadre[y.name] if pres.years[y.name] else '' }}</td>
+        <td>{{ {'phd': 'Ph.D.', 'mtech': 'M.Tech/M.E.', 'other': 'Other'}[pres.degree[y.name]] if pres.years[y.name] else '' }}</td></tr>{% endfor %}
+    </table>
+    <p class="tiny muted" style="margin-bottom:0">Counted in a year if on the rolls for at least 6 months of it. Designation and degree as on 1 January of that year.</p>
+  </div>
+</div>
+
+<h2>Proofs</h2>
+{% for kind, label in kinds.items() %}
+{% set mine = files | selectattr('kind', 'equalto', kind) | list %}
+{% set state = st.get(kind, 'missing') %}
+<div class="item">
+  <div class="item-head">
+    <span class="code">{{ loop.index }}</span>
+    <div class="t"><b>{{ label }}</b>
+      <span class="small muted">{% if kind == 'appointment' %}Checks name, institute, joining date and designation.{% elif kind == 'degree' %}Checks name, the degree (Ph.D. / M.Tech) and university.{% else %}Optional: needed when the designation changed (promotion).{% endif %}</span></div>
+    {% if state == 'verified' %}<span class="pill ok">✓ Checked</span>{% elif state == 'problem' %}<span class="pill bad">✗ Does not match</span>
+    {% elif kind == 'promotion' %}<span class="pill grey">Optional</span>{% else %}<span class="pill warn">Not uploaded</span>{% endif %}
+  </div>
+  <div class="item-body">
+    {% for x in mine %}
+    <div class="entry" style="align-items:flex-start">
+      <div class="who"><a href="{{ url_for('faculty.view_proof', program_id=p.id, fid=f.id, proof_id=x.id) }}" target="_blank"><b>📎 {{ x.original_name }}</b></a>
+        <div class="small muted">uploaded {{ x.created_at[:16] }}</div>
+        <ul class="small" style="margin:6px 0 0;padding-left:18px">
+          {% for c in x.checks %}<li style="color:{{ 'var(--ok)' if c.ok else ('var(--bad)' if c.ok == false else 'var(--muted)') }}">{{ '✓' if c.ok else ('✗' if c.ok == false else '•') }} {{ c.text }}</li>{% endfor %}
+        </ul></div>
+      {% if can_edit %}<form method="post" action="{{ url_for('faculty.delete_proof', program_id=p.id, fid=f.id, proof_id=x.id) }}" class="inline">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="ghost sm">Remove</button></form>{% endif %}
+    </div>
+    {% endfor %}
+    {% if can_edit %}
+    <form method="post" action="{{ url_for('faculty.upload', program_id=p.id, fid=f.id) }}" enctype="multipart/form-data" style="margin-top:8px">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}"><input type="hidden" name="kind" value="{{ kind }}">
+      <label class="dropzone" style="margin:0;padding:12px"><span class="small">⬆ Upload {{ label|lower }} (PDF, PNG or JPG; a phone photo works)</span>
+        <input type="file" name="files" accept=".pdf,.png,.jpg,.jpeg" capture="environment" onchange="this.form.submit()"></label>
+    </form>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

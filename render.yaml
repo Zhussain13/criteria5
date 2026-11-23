@@ -1,0 +1,17 @@
+# Free public demo website on Render (render.com): New > Blueprint > pick this repo > Apply.
+# The free plan has no permanent disk, so the demo data is recreated on every start.
+services:
+  - type: web
+    name: cmrsarathi-criterion5
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: flask --app run seed-demo && gunicorn -w 2 -b 0.0.0.0:$PORT "app:create_app()"
+    healthCheckPath: /auth/login
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: CMRSARATHI_DEMO
+        value: "1"
+      - key: CMRSARATHI_SECRET_KEY
+        generateValue: true

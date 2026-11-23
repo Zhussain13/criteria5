@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Faculty list{% endblock %}
+{% block content %}
+<div class="crumbs"><a href="{{ url_for('programs.detail', program_id=p.id) }}">{{ p.name }}</a> › Faculty list</div>
+<div class="page-head">
+  <div><div class="eyebrow">NBA Table B2.A · Department + allied departments</div>
+    <h1>Faculty list</h1>
+    <p class="sub" style="margin:4px 0 0">One list for Criterion 5. The app counts F, Ph.D., cadre, retention and the HoD and
+      Professor conditions from it for every year, so nobody counts by hand.</p></div>
+  <div class="actions">
+    {% if can_edit %}<a class="btn accent" href="{{ url_for('faculty.edit', program_id=p.id) }}">＋ Add faculty</a>{% endif %}
+    <a class="btn secondary" href="{{ url_for('claims.data_sheet', program_id=p.id, criterion=5) }}">🧮 Criterion 5 numbers</a>
+  </div>
+</div>
+
+<div class="stats">
+  {% for y in years %}<div class="stat"><div class="v">{{ counts[y.name] }}</div><div class="k">counted in {{ y.name }} ({{ y.label }})</div></div>{% endfor %}
+  {% set ver = st.values()|selectattr('appointment', 'equalto', 'verified')|list|length %}
+  <div class="stat"><div class="v">{{ ver }}</div>
+    <div class="k">appointment letters checked</div></div>
+</div>
+
+{% if can_edit %}
+<div class="cols" style="margin-bottom:14px">
+  <form method="post" action="{{ url_for('faculty.import_list', program_id=p.id) }}" enctype="multipart/form-data" class="card flat" style="margin:0">
+    <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+    <b>Import the list from the ERP or Excel</b>
+    <p class="small muted" style="margin:4px 0 10px">An Excel/CSV export from the ERP (Juno Campus) or a sheet in the NBA Table B2.A
+      format. Column names are matched automatically. <a href="{{ url_for('faculty.template', program_id=p.id) }}">Download the template</a>.</p>
+    <label class="small"><input type="checkbox" name="mode" value="replace" style="width:auto"> Update people already in the list</label>
+    <label class="dropzone" style="margin:8px 0 0"><span class="big">⬆</span>Click or drop the Excel / CSV file here
+      <input type="file" name="sheet" accept=".csv,.xlsx" required onchange="this.form.submit()"><div class="files"></div></label>
+  </form>
+  <div class="card flat" style="margin:0">
+    <b>How proofs are checked (no AI)</b>
+    <ul class="small" style="margin:6px 0 0;padding-left:18px">
+      <li>Open a person and upload the <b>appointment letter</b> and the <b>highest degree certificate</b> (PDF or photo).</li>
+      <li>The app reads them with free OCR and checks the <b>name</b>, <b>institute</b>, <b>joining date</b>, <b>designation</b> and <b>degree</b>.</li>
+      <li>The audit shows the marks as claimed and the marks if the peer team accepts <b>only checked proofs</b>.</li>
+    </ul>
+    <form method="post" action="{{ url_for('faculty.recheck_all', program_id=p.id) }}" style="margin-top:10px">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}"><button class="secondary sm" data-busy="Checking…">↻ Check all proofs again</button></form>
+  </div>
+</div>
+{% endif %}
+
+<div class="row" style="gap:8px;margin-bottom:10px">
+  <a class="btn sm {{ 'secondary' if show }}" href="{{ url_for('faculty.list_faculty', program_id=p.id) }}">Everyone</a>
+  <a class="btn sm {{ 'secondary' if not show }}" href="{{ url_for('faculty.list_faculty', program_id=p.id, show='issues') }}">Proofs to fix</a>
+</div>
+<div class="table-wrap">
+<table>
+  <tr><th>Faculty</th><th>Department</th><th>Designation</th><th>Highest degree</th><th>Joined / left</th>
+    {% for y in years %}<th class="center" title="{{ y.label }}">{{ y.name }}</th>{% endfor %}<th>Proofs</th></tr>
+  {% for f in faculty %}{% set s = st.get(f.id, {}) %}{% set pr = pres[f.id] %}
+  <tr>
+    <td><a href="{{ url_for('faculty.detail', program_id=p.id, fid=f.id) }}"><b>{{ f.name }}</b></a>
+      {% if f.is_hod %}<span class="pill blue">HoD</span>{% endif %}
+      <div class="small muted">{{ f.nature }}{% if not f.full_time %} · part-time{% endif %}{% if f.first_year %} · 100% first year{% endif %}</div></td>
+    <td class="small">{{ f.department or p.department }}{% if f.allied %} <span class="pill grey">allied</span>{% endif %}</td>
+    <td class="small">{{ f.designation }}{% if f.designated_on %}<div class="muted">since {{ f.designated_on }}</div>{% endif %}</td>
+    <td>{% if f.qualification %}<span class="pill {{ 'ok' if f.qualification == 'Ph.D.' else 'grey' }}">{{ f.qualification }}</span>{% endif %}
+      {% if f.phd_date %}<div class="tiny muted">{{ f.phd_date }}</div>{% endif %}</td>
+    <td class="small">{{ f.joining_date or '–' }}{% if f.leaving_date %}<div style="color:var(--bad)">left {{ f.leaving_date }}</div>{% endif %}</td>
+    {% for y in years %}<td class="center">{% if pr.years[y.name] %}<span title="{{ pr.cadre[y.name] }}, {{ pr.degree[y.name] }}" style="color:var(--ok);font-weight:700">✓</span>{% else %}<span class="muted">–</span>{% endif %}</td>{% endfor %}
+    <td class="small" style="white-space:nowrap">
+      {% for k, label in [('appointment', 'Letter'), ('degree', 'Degree')] %}{% set v = s.get(k, 'missing') %}
+        <span class="pill {{ 'ok' if v == 'verified' else ('bad' if v == 'problem' else 'warn') }}" title="{{ label }}: {{ v }}">{{ label }} {{ '✓' if v == 'verified' else ('✗' if v == 'problem' else '?') }}</span>
+      {% endfor %}</td>
+  </tr>
+  {% else %}<tr><td colspan="9" class="muted center" style="padding:24px">No faculty yet. Import the ERP export or add people one by one.</td></tr>{% endfor %}
+</table>
+</div>
+<p class="small muted">✓ in a year column = counted in that academic year (on the rolls for at least 6 months of it). Proofs: ✓ checked,
+  ✗ does not match, ? not uploaded.</p>
+{% endblock %}
