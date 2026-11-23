@@ -143,7 +143,7 @@ def faculty_issues(db, program, years_obj) -> list[dict]:
     pid = program["id"]
     faculty = db.execute("SELECT * FROM faculty WHERE program_id = ? ORDER BY name", (pid,)).fetchall()
     st = proof_status(db, pid)
-    ros = Roster(faculty, years_obj)
+    ros = Roster.from_db(db, program, faculty=faculty)
     detail = {}
     for r in db.execute("SELECT fp.faculty_id, fp.kind, fp.checks_json FROM faculty_proofs fp JOIN faculty f "
                         "ON f.id = fp.faculty_id WHERE f.program_id = ?", (pid,)):

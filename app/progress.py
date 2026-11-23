@@ -33,7 +33,7 @@ def program_progress(db, p) -> dict:
     filled = sum(1 for c in cells if c in metrics)
 
     years = AssessmentYears(p["cay_start_year"], p["ay_start_month"])
-    ros = Roster(faculty, years)
+    ros = Roster.from_db(db, p, faculty=faculty)
     counted = [f for f in faculty if any(ros.present(f, y) for y in YEARS)]
     st = proof_status(db, pid)
     need = sum(1 + (degree_of(f["qualification"]) in ("phd", "mtech")) for f in counted)

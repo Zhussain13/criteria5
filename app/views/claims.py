@@ -418,7 +418,11 @@ def data_sheet(program_id, criterion):
                 all_years.append(y)
     order = ["CAY", "CAYm1", "CAYm2", "CAYm3", "CAYm4", "CAYm5", "CAYm6"]
     all_years.sort(key=order.index)
-    headers = [{"name": y, "display": display_name(y), "label": years_obj.label(y)} for y in all_years]
+    from ..erp import last_imports
+
+    done = last_imports(db, program_id)
+    headers = [{"name": y, "display": display_name(y), "label": years_obj.label(y),
+                "erp": done[y]["ay_label"] if y in done else None} for y in all_years]
     crit = rules.load(p["sar_version"])["criteria"][criterion]
     return render_template("claims/data.html", p=p, criterion=criterion, crit=crit, fields=fields,
                            headers=headers, values=values, can_edit=can_edit,

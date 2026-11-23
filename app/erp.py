@@ -8,8 +8,12 @@ Modes (environment variable ERP_MODE):
               account from CMRIT IT; until then it reports "not connected".
 - "off"       no ERP button.
 
-Every connector returns records in the same shape as the faculty list (app/views/faculty.FIELDS), so the import,
-the comparison and the proof re-checks are the same whatever the source.
+The ERP keeps its data academic year by academic year. The import works the same way: pick the ERP academic year
+(e.g. 2023-24) and the SAR year it belongs to (e.g. CAYm2); that year's staff list (who was on the rolls, with the
+designation, degree and load of that year) and that year's student strength go into that SAR year.
+
+Every connector returns records in the same shape as the faculty list (app/views/faculty.FIELDS) plus a
+"this_year" part, so the import, the comparison and the proof re-checks are the same whatever the source.
 """
 from __future__ import annotations
 
@@ -18,6 +22,8 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from flask import current_app
+
+from .years import AssessmentYears, ay_label
 
 
 class NotConnected(Exception):
@@ -67,6 +73,36 @@ class DemoERP:
 
         return {k: v for k, v in STUDENTS.items() if k[0] in ("S", "DS")}
 
+    # ---- year-wise data, as the ERP stores it -------------------------------------------------
+    STUDENTS_BY_YEAR = {0: (2160, 1200), 1: (2040, 1140), 2: (1920, 1080), 3: (1800, 1020), 4: (1680, 960)}
+
+    def years(self, program) -> list[int]:
+        """Academic years (start year) the ERP has data for, newest first."""
+        from .demo import CURRENT_CAY
+
+        return [CURRENT_CAY - i for i in range(5)]
+
+    def year_data(self, program, start: int) -> dict:
+        """The ERP's records for one academic year: staff on the rolls that year (with that year's designation,
+        degree and load) and the student strength of that year."""
+        from .demo import CURRENT_CAY
+        from .roster import Roster, cadre_of
+
+        years = AssessmentYears(start)
+        master = self.faculty(program)
+        ros = Roster([{**r, "id": i} for i, r in enumerate(master)], years)
+        staff = []
+        for i, r in enumerate(master):
+            f = {**r, "id": i}
+            if not ros.present(f, "CAY"):
+                continue
+            deg = {"phd": "Ph.D."}.get(ros.degree_in(f, "CAY"), r["qualification"] if r["qualification"] != "Ph.D." else "M.Tech")
+            this = {"designation": ros.designation_in(f, "CAY") or cadre_of(r["designation"]), "qualification": deg,
+                    "nature": r["nature"], "full_time": r["full_time"], "first_year": r["first_year"], "allied": r["allied"]}
+            staff.append({**r, "this_year": this})
+        s, ds = self.STUDENTS_BY_YEAR.get(CURRENT_CAY - start, (0, 0))
+        return {"faculty": staff, "students": {"S": s, "DS": ds}}
+
 
 class DatabaseERP:
     """Read-only link to the ERP database. Filled in once CMRIT IT shares the table structure."""
@@ -87,6 +123,12 @@ class DatabaseERP:
         raise NotConnected(self.status().detail)
 
     def students(self, program) -> dict:
+        raise NotConnected(self.status().detail)
+
+    def years(self, program) -> list[int]:
+        raise NotConnected(self.status().detail)
+
+    def year_data(self, program, start: int) -> dict:
         raise NotConnected(self.status().detail)
 
 
@@ -144,3 +186,76 @@ def compare(db, program, erp_rows: list[dict]) -> dict:
 
 def today_iso() -> str:
     return (date.today() + timedelta(0)).isoformat()
+
+
+def year_preview(db, program, con, start: int, slot: str) -> dict:
+    """What importing ERP academic year `start` into SAR year `slot` would do."""
+    from .roster import Roster, merged_metrics
+
+    data = con.year_data(program, start)
+    diff = compare(db, program, [{k: v for k, v in r.items() if k != "this_year"} for r in data["faculty"]])
+    # the counts that year's ERP list gives, next to what the SAR shows now
+    recs = [{**r, "id": i} for i, r in enumerate(data["faculty"])]
+    years = AssessmentYears(program["cay_start_year"], program["ay_start_month"])
+    tmp = Roster(recs, years, snapshots={slot: {i: r["this_year"] for i, r in enumerate(data["faculty"])}})
+    stu = {("S", slot): data["students"]["S"], ("DS", slot): data["students"]["DS"]}
+    after = tmp.metrics(stu) if slot in ("CAY", "CAYm1", "CAYm2") else {}
+    now, _ = merged_metrics(db, program)
+    keys = [("S", "Students, Department + allied (S)"), ("DS", "Students, Department alone (DS)"),
+            ("F", "Full-time faculty (F)"), ("PHD", "Faculty with Ph.D."), ("MTECH", "Faculty with M.Tech/M.E."),
+            ("AF1", "Professors"), ("AF2", "Associate Professors"), ("AF3", "Assistant Professors"),
+            ("FF", "100% first-year load (FF)")]
+    rows = []
+    for k, label in keys:
+        new = stu.get((k, slot)) if k in ("S", "DS") else after.get((k, slot))
+        if new is None:
+            continue
+        rows.append({"key": k, "label": label, "now": now.get((k, slot)), "erp": new})
+    return {"ay": start, "ay_label": ay_label(start), "slot": slot, "slot_label": years.label(slot),
+            "match": ay_label(start) == years.label(slot), "staff": len(data["faculty"]), "diff": diff,
+            "rows": rows, "data": data}
+
+
+def import_year(db, program, con, start: int, slot: str, user_id, with_students: bool = True) -> str:
+    """Put ERP academic year `start` into SAR year `slot`: staff list (people + that year's details) and
+    student strength. Returns a one-line summary."""
+    from . import proofs as P
+    from .faculty_proofs import recheck_faculty
+    from .views.faculty import save_row
+
+    pv = year_preview(db, program, con, start, slot)
+    for r in pv["diff"]["new"]:
+        save_row(db, program["id"], r, source="erp")
+    for ch in pv["diff"]["changed"]:
+        save_row(db, program["id"], ch["row"], ch["id"], source="erp")
+        recheck_faculty(db, program, ch["id"])
+    ids = {P.normalise_name(f["name"]): f["id"] for f in
+           db.execute("SELECT id, name FROM faculty WHERE program_id = ?", (program["id"],))}
+    db.execute("DELETE FROM faculty_year WHERE year = ? AND faculty_id IN (SELECT id FROM faculty WHERE program_id = ?)",
+               (slot, program["id"]))
+    for r in pv["data"]["faculty"]:
+        t = r["this_year"]
+        db.execute("INSERT OR REPLACE INTO faculty_year (faculty_id, year, ay_label, designation, qualification, nature, "
+                   "full_time, first_year, allied) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                   (ids[P.normalise_name(r["name"])], slot, pv["ay_label"], t["designation"], t["qualification"],
+                    t["nature"], t["full_time"], t["first_year"], t["allied"]))
+    if with_students:
+        for k in ("S", "DS"):
+            db.execute("INSERT INTO metrics (program_id, key, year, value, updated_by) VALUES (?, ?, ?, ?, ?) "
+                       "ON CONFLICT(program_id, key, year) DO UPDATE SET value = excluded.value, "
+                       "updated_by = excluded.updated_by, updated_at = datetime('now')",
+                       (program["id"], k, slot, pv["data"]["students"][k], user_id))
+    summary = (f"ERP {pv['ay_label']} into {slot}: {pv['staff']} staff that year, {len(pv['diff']['new'])} new, "
+               f"{len(pv['diff']['changed'])} updated" + (", student strength" if with_students else ""))
+    db.execute("INSERT INTO erp_imports (program_id, year, ay_label, user_id, summary) VALUES (?, ?, ?, ?, ?)",
+               (program["id"], slot, pv["ay_label"], user_id, summary))
+    return summary
+
+
+def last_imports(db, program_id: int) -> dict:
+    """{SAR year: latest import row} for showing "from ERP 2023-24" next to each year."""
+    out = {}
+    for r in db.execute("SELECT e.*, u.name AS user_name FROM erp_imports e LEFT JOIN users u ON u.id = e.user_id "
+                        "WHERE e.program_id = ? ORDER BY e.id", (program_id,)):
+        out[r["year"]] = dict(r)
+    return out

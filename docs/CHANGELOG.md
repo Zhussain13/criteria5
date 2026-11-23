@@ -1,5 +1,15 @@
 # Changelog
 
+## 23 Nov 2026 — ERP import by academic year
+
+- The ERP import is now year-wise, as the ERP stores its data: pick the ERP academic year (e.g. 2023-24) and the
+  SAR year (e.g. CAYm2). That year's staff list (with that year's designation, degree, load) and student strength
+  go into that SAR year. The matching SAR year is suggested; a mismatch is flagged.
+- "Import all assessment years" imports CAY to CAYm3, each from its own ERP year.
+- Preview shows the SAR numbers now and after the import (S, DS, F, Ph.D., M.Tech, cadre, FF), new and changed faculty.
+- New tables `faculty_year` (year-wise staff list) and `erp_imports`; counting uses the ERP list for imported years.
+- Numbers page and faculty list show "ERP 2023-24" on years that came from the ERP.
+
 ## 23 Nov 2026 — ERP link and shared updates
 
 - **Import from ERP** button on the faculty list and the Numbers page: reads the faculty records and student

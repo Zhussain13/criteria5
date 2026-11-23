@@ -13,7 +13,7 @@ Same design, same logins and roles as CMRSARathi, cut down to Criterion 5 and bu
 
 | Step | What the app does |
 |---|---|
-| 1. Faculty list (NBA Table B2.A) | **Import from ERP**: one click reads the faculty records and student strength from the ERP (Juno Campus) and fills them into the Criterion 5 SAR tables; the member sees every new person and every changed detail before it is saved. Or upload an Excel/CSV export, or add people one by one. Department and allied departments together. |
+| 1. Faculty list (NBA Table B2.A) | **Import from ERP, year-wise**: the ERP keeps data academic year by academic year. Pick the ERP year (e.g. 2023-24) and the SAR year it goes into (e.g. CAYm2): that year's staff list (who was on the rolls, with that year's designation, degree and load) and that year's student strength are filled into that SAR year. The app suggests the matching SAR year and warns if the years do not match; "Import all assessment years" does CAY to CAYm3 in one go. Every new person, changed detail and number is shown before it is saved. Or upload an Excel/CSV export, or add people one by one. Department and allied departments together. |
 | 2. Counting | For CAY, CAYm1 and CAYm2 it counts F, PoP, FF, Ph.D., M.Tech, Professors / Associate / Assistant Professors, retention bands A-E, the HoD and Professor conditions. Promotions and Ph.D. award dates are respected year by year. Nobody counts by hand. |
 | 3. Numbers | Only the student strength (S, DS, from the ERP admissions data) and three pre-qualifier facts are typed in. Visiting-faculty hours are added up from SAR Table 5.4.1. |
 | 4. Proof check | Each person's appointment letter and degree certificate (PDF or phone photo) is read with free OCR (pdfplumber / Tesseract) and checked: name, institute, joining date, designation, degree, university, duplicate files. Every failed check says why. |
@@ -41,12 +41,15 @@ faculty (NBA Annexure-I).
 
 | Mode | What it does |
 |---|---|
-| `demo` (default) | Demo connection with sample data shaped like a Juno Campus export: 2 new joinees, 1 person who left, 1 promotion since the last import. Clearly labelled as sample data on screen. |
+| `demo` (default) | Demo connection with sample year-wise data (2021-22 to 2025-26) shaped like a Juno Campus export: 2 new joinees, 1 person who left, 1 promotion since the last import. Clearly labelled as sample data on screen. |
 | `database` | Read-only connection to the ERP database (`ERP_DB_URL`). Needs a read-only account and the table structure from CMRIT IT; until the tables are mapped it says "not connected". |
 | `off` | No ERP button. |
 
-All modes return the same record shape as the faculty list, so the comparison, the import and the proof re-checks
-are the same (`app/erp.py`).
+All modes return, for one academic year, the same record shape as the faculty list plus that year's details, so the
+comparison, the import and the proof re-checks are the same (`app/erp.py`). An imported year is stored per SAR year
+(`faculty_year`, `erp_imports`); for that year the ERP's staff list decides who counts and as what. Years without an
+ERP import use the dates in the faculty list. The Numbers page and the faculty list show "ERP 2023-24" on each year
+that came from the ERP.
 
 ## Roles
 
@@ -93,7 +96,7 @@ there is no Tesseract, so only text PDFs are read; on the CMRIT server install T
 | ![Faculty list](docs/screenshots/3_faculty_list.png) | ![Numbers](docs/screenshots/4_numbers.png) |
 | ![Audit report](docs/screenshots/5_audit_report.png) | ![Proof check](docs/screenshots/6_proof_check.png) |
 | ![ERP link](docs/screenshots/7_erp_link.png) | ![Import from ERP](docs/screenshots/8_erp_import.png) |
-| ![Principal: recent updates](docs/screenshots/9_principal_updates.png) | |
+| ![Principal: recent updates](docs/screenshots/9_principal_updates.png) | ![ERP year in the SAR](docs/screenshots/10_erp_year_in_sar.png) |
 
 ## Code map
 

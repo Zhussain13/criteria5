@@ -165,7 +165,7 @@ def list_faculty(program_id):
     faculty = db.execute("SELECT * FROM faculty WHERE program_id = ? ORDER BY allied, "
                          "CASE WHEN is_hod THEN 0 ELSE 1 END, name", (program_id,)).fetchall()
     years = AssessmentYears(p["cay_start_year"], p["ay_start_month"])
-    pres = {r["id"]: r for r in Roster(faculty, years).presence_table()}
+    pres = {r["id"]: r for r in Roster.from_db(db, p, faculty=faculty).presence_table()}
     st = proof_status(db, program_id)
     counts = {y: sum(1 for r in pres.values() if r["years"][y]) for y in YEARS}
     show = request.args.get("show", "")
@@ -176,8 +176,12 @@ def list_faculty(program_id):
     last_erp = db.execute("SELECT a.created_at, a.detail, u.name FROM activity a LEFT JOIN users u ON u.id = a.user_id "
                           "WHERE a.program_id = ? AND a.action = 'Imported from ERP' ORDER BY a.id DESC LIMIT 1",
                           (program_id,)).fetchone()
+    from ..erp import last_imports
+
+    done = last_imports(db, program_id)
     return render_template("faculty/list.html", p=p, acc=acc, faculty=faculty, pres=pres, st=st, counts=counts,
-                           years=[{"name": y, "label": years.label(y)} for y in YEARS], can_edit=_can_edit(acc),
+                           years=[{"name": y, "label": years.label(y), "erp": done[y]["ay_label"] if y in done else None}
+                                  for y in YEARS], can_edit=_can_edit(acc),
                            show=show, erp=con.status() if con else None, last_erp=last_erp)
 
 
@@ -226,7 +230,7 @@ def detail(program_id, fid):
     if f is None:
         abort(404)
     years = AssessmentYears(p["cay_start_year"], p["ay_start_month"])
-    pres = Roster([f], years).presence_table()[0]
+    pres = Roster.from_db(db, p, faculty=[f]).presence_table()[0]
     files = db.execute("SELECT * FROM faculty_proofs WHERE faculty_id = ? ORDER BY kind, id", (fid,)).fetchall()
     files = [{**dict(x), "checks": json.loads(x["checks_json"] or "[]"),
               "by": (db.execute("SELECT name FROM users WHERE id = ?", (x["uploaded_by"],)).fetchone() or {"name": ""})["name"]
@@ -410,69 +414,82 @@ def recheck_all(program_id):
     return redirect(url_for("faculty.list_faculty", program_id=program_id))
 
 
-# ------------------------------------------------------------------ ERP link
+# ------------------------------------------------------------------ ERP link (year-wise)
+
+SLOTS = ["CAY", "CAYm1", "CAYm2", "CAYm3"]
+
+
+def _erp_or_404():
+    con = connector()
+    if con is None:
+        abort(404)
+    return con
+
 
 @bp.route("/erp")
 @login_required
 def erp_preview(program_id):
-    """Read the ERP and show what would change, before anything is saved."""
+    """Pick an ERP academic year and the SAR year it goes into; see what will change before saving."""
+    from ..erp import last_imports, year_preview
+
     acc = program_access(program_id)
     if not _can_edit(acc):
         abort(403)
     p = acc["program"]
-    con = connector()
-    if con is None:
-        abort(404)
-    status = con.status()
-    diff, students, error = None, {}, ""
+    con = _erp_or_404()
+    db = get_db()
+    years = AssessmentYears(p["cay_start_year"], p["ay_start_month"])
+    slots = [{"name": y, "label": years.label(y)} for y in SLOTS]
+    status, error, pv, available = con.status(), "", None, []
     try:
-        diff = compare(get_db(), p, con.faculty(p))
-        students = con.students(p)
+        available = con.years(p)
+        ay = int(request.args.get("ay") or years.start_of("CAY"))
+        if ay not in available:
+            ay = available[0]
+        slot = request.args.get("slot") or next((y for y in SLOTS if years.start_of(y) == ay), "CAY")
+        if slot not in SLOTS:
+            abort(400)
+        pv = year_preview(db, p, con, ay, slot)
     except NotConnected as e:
         error = str(e)
-    db = get_db()
-    typed = {(r["key"], r["year"]): r["value"] for r in db.execute(
-        "SELECT key, year, value FROM metrics WHERE program_id = ? AND key IN ('S', 'DS')", (program_id,))}
-    years = AssessmentYears(p["cay_start_year"], p["ay_start_month"])
-    stu_rows = [{"key": k, "year": y, "label": years.label(y), "erp": v, "now": typed.get((k, y))}
-                for (k, y), v in sorted(students.items())]
-    return render_template("faculty/erp.html", p=p, acc=acc, status=status, diff=diff, students=stu_rows, error=error)
+    plan = [{"slot": y, "label": years.label(y), "ay": years.start_of(y), "ok": years.start_of(y) in available}
+            for y in SLOTS]
+    from ..years import ay_label
+    return render_template("faculty/erp.html", p=p, acc=acc, status=status, pv=pv, error=error, slots=slots,
+                           available=[{"start": a, "label": ay_label(a)} for a in available], plan=plan,
+                           done=last_imports(db, program_id))
 
 
 @bp.route("/erp", methods=("POST",))
 @login_required
 def erp_import(program_id):
-    """Copy the ERP data into the SAR tables: new faculty, changed details, student strength."""
+    """Put one ERP academic year into one SAR year (or every assessment year at once)."""
+    from ..erp import import_year
+
     acc = program_access(program_id)
     if not _can_edit(acc):
         abort(403)
     p = acc["program"]
-    con = connector()
-    if con is None:
-        abort(404)
+    con = _erp_or_404()
     db = get_db()
+    years = AssessmentYears(p["cay_start_year"], p["ay_start_month"])
     try:
-        diff = compare(db, p, con.faculty(p))
-        students = con.students(p)
+        if request.form.get("all"):
+            available = set(con.years(p))
+            todo = [(years.start_of(y), y) for y in SLOTS if years.start_of(y) in available]
+        else:
+            ay, slot = int(request.form.get("ay", "0")), request.form.get("slot", "")
+            if slot not in SLOTS or ay not in con.years(p):
+                abort(400)
+            todo = [(ay, slot)]
+        msgs = [import_year(db, p, con, ay, slot, g.user["id"], bool(request.form.get("students") or
+                                                                    request.form.get("all")))
+                for ay, slot in todo]
     except NotConnected as e:
         flash(str(e), "error")
         return redirect(url_for("faculty.erp_preview", program_id=program_id))
-    for r in diff["new"]:
-        save_row(db, program_id, r, source="erp")
-    for ch in diff["changed"]:
-        save_row(db, program_id, ch["row"], ch["id"], source="erp")
-        recheck_faculty(db, p, ch["id"])
-    n_stu = 0
-    if request.form.get("students"):
-        for (k, y), v in students.items():
-            db.execute("INSERT INTO metrics (program_id, key, year, value, updated_by) VALUES (?, ?, ?, ?, ?) "
-                       "ON CONFLICT(program_id, key, year) DO UPDATE SET value = excluded.value, "
-                       "updated_by = excluded.updated_by, updated_at = datetime('now')",
-                       (program_id, k, y, v, g.user["id"]))
-            n_stu += 1
-    msg = (f"{len(diff['new'])} new faculty, {len(diff['changed'])} updated"
-           + (f", {n_stu} student numbers" if n_stu else ""))
-    activity.log(db, program_id, "Imported from ERP", msg)
+    for m in msgs:
+        activity.log(db, program_id, "Imported from ERP", m)
     db.commit()
-    flash(f"Imported from the ERP: {msg}. The Criterion 5 numbers and SAR tables are updated.", "ok")
-    return redirect(url_for("faculty.list_faculty", program_id=program_id))
+    flash("Imported from the ERP. " + " | ".join(msgs) + ". The Criterion 5 numbers and SAR tables are updated.", "ok")
+    return redirect(url_for("claims.data_sheet", program_id=program_id, criterion=5))

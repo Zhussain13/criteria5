@@ -43,31 +43,54 @@ def test_demo(app):
     assert owner.get("/platform/").status_code == 200
 
 
-def test_erp_import_by_member_is_seen_by_head_hod_principal(app):
+def _tok(html):
+    return re.search(r'name="_csrf" value="([^"]+)"', html).group(1)
+
+
+def test_erp_year_wise_import_seen_by_head_hod_principal(app):
     seed(app)
     member = login(app, "member@cmrit.local")
     page = member.get("/programs/1/faculty/").get_data(as_text=True)
     assert "Import from ERP" in page and "Demo ERP connection" in page
-    preview = member.get("/programs/1/faculty/erp").get_data(as_text=True)
-    assert "CSE Faculty 065" in preview and "DS Faculty 031" in preview      # new joinees in the ERP
-    assert "AIML Faculty 005" in preview                                     # left: leaving date changed
-    tok = re.search(r'name="_csrf" value="([^"]+)"', preview).group(1)
-    r = member.post("/programs/1/faculty/erp", data={"_csrf": tok, "students": "1"}, follow_redirects=True)
-    assert "Imported from the ERP: 2 new faculty, 2 updated" in r.get_data(as_text=True)
+    # ERP 2023-24 into CAYm2: the years match
+    pv = member.get("/programs/1/faculty/erp?ay=2023&slot=CAYm2").get_data(as_text=True)
+    assert "ERP 2023-24 → CAYm2 (2023-24): the years match" in pv
+    # a wrong pairing is flagged
+    bad = member.get("/programs/1/faculty/erp?ay=2023&slot=CAYm1").get_data(as_text=True)
+    assert "which is <b>2024-25</b> in this SAR" in bad
+    r = member.post("/programs/1/faculty/erp", data={"_csrf": _tok(pv), "ay": "2023", "slot": "CAYm2", "students": "1"},
+                    follow_redirects=True)
+    html = r.get_data(as_text=True)
+    assert "ERP 2023-24 into CAYm2" in html and "ERP 2023-24" in html      # shown on the Numbers page header
     with app.app_context():
         db = get_db()
+        assert db.execute("SELECT value FROM metrics WHERE key = 'S' AND year = 'CAYm2'").fetchone()[0] == 1920
+        labels = {r[0] for r in db.execute("SELECT DISTINCT ay_label FROM faculty_year WHERE year = 'CAYm2'")}
+        assert labels == {"2023-24"}
+        n_snap = db.execute("SELECT COUNT(*) FROM faculty_year WHERE year = 'CAYm2'").fetchone()[0]
+    # the CAYm2 count now comes from the ERP's 2023-24 staff list
+    from app.roster import merged_metrics
+    with app.app_context():
+        db = get_db()
+        prog = db.execute("SELECT * FROM programs WHERE id = 1").fetchone()
+        m, auto = merged_metrics(db, prog)
+        assert ("F", "CAYm2") in auto and 0 < m[("F", "CAYm2")] <= n_snap
+    # import every assessment year at once: the two new joinees of 2025-26 come in with CAY
+    r = member.post("/programs/1/faculty/erp", data={"_csrf": _tok(pv), "all": "1"}, follow_redirects=True)
+    with app.app_context():
+        db = get_db()
+        assert {r[0]: r[1] for r in db.execute("SELECT year, ay_label FROM erp_imports")} == {
+            "CAY": "2025-26", "CAYm1": "2024-25", "CAYm2": "2023-24", "CAYm3": "2022-23"}
+        assert db.execute("SELECT COUNT(*) FROM faculty WHERE name IN ('CSE Faculty 065', 'DS Faculty 031')").fetchone()[0] == 2
         f = db.execute("SELECT source, leaving_date FROM faculty WHERE name = 'AIML Faculty 005'").fetchone()
         assert f["source"] == "erp" and f["leaving_date"]
-        assert db.execute("SELECT COUNT(*) FROM faculty WHERE name IN ('CSE Faculty 065', 'DS Faculty 031')").fetchone()[0] == 2
-    # a second look finds nothing new
-    again = member.get("/programs/1/faculty/erp").get_data(as_text=True)
-    assert "Import 0 faculty changes" in again
     # the member's work is visible to the criteria head, the HoD and the principal
     for email in ("head@cmrit.local", "hod@cmrit.local", "principal@cmrit.local"):
         c = login(app, email)
         dash = c.get("/programs/1").get_data(as_text=True)
         assert "Imported from ERP" in dash and "Criteria member - Criterion 5" in dash, email
         assert "CSE Faculty 065" in c.get("/programs/1/faculty/").get_data(as_text=True), email
+        assert "ERP 2023-24" in c.get("/programs/1/criteria/5/data").get_data(as_text=True), email
     assert "Recent updates" in login(app, "principal@cmrit.local").get("/").get_data(as_text=True)
 
 

@@ -75,6 +75,32 @@ CREATE TABLE IF NOT EXISTS faculty (
     updated_at   TEXT
 );
 
+-- Year-wise staff list read from the ERP: who was on the rolls in that academic year and as what.
+-- `year` is the SAR year (CAY, CAYm1, ...) it was put into; `ay_label` the ERP academic year (e.g. 2023-24).
+CREATE TABLE IF NOT EXISTS faculty_year (
+    faculty_id    INTEGER NOT NULL REFERENCES faculty(id) ON DELETE CASCADE,
+    year          TEXT NOT NULL,
+    ay_label      TEXT NOT NULL,
+    designation   TEXT,
+    qualification TEXT,
+    nature        TEXT,
+    full_time     INTEGER,
+    first_year    INTEGER,
+    allied        INTEGER,
+    PRIMARY KEY (faculty_id, year)
+);
+
+-- Each ERP import: which ERP academic year went into which SAR year, by whom.
+CREATE TABLE IF NOT EXISTS erp_imports (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    program_id  INTEGER NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+    year        TEXT NOT NULL,
+    ay_label    TEXT NOT NULL,
+    user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    summary     TEXT NOT NULL DEFAULT '',
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- Who changed what (shown to the criteria head, HoD and principal on the dashboard).
 CREATE TABLE IF NOT EXISTS activity (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -4,10 +4,10 @@
 <div class="crumbs"><a href="{{ url_for('programs.detail', program_id=p.id) }}">{{ p.name }}</a> ›
   <a href="{{ url_for('faculty.list_faculty', program_id=p.id) }}">Faculty list</a> › Import from ERP</div>
 <div class="page-head">
-  <div><div class="eyebrow">ERP link · Juno Campus</div>
+  <div><div class="eyebrow">ERP link · Juno Campus · year-wise</div>
     <h1>Import from the ERP</h1>
-    <p class="sub" style="margin:4px 0 0">The ERP has been read. Check what will change, then import: the faculty list (Table B2.A)
-      and the student strength are filled in the Criterion 5 SAR tables, and every number is counted again.</p></div>
+    <p class="sub" style="margin:4px 0 0">The ERP keeps its data academic year by academic year. Pick the ERP year and the SAR year it
+      belongs to: that year's staff list (with that year's designation, degree and load) and student strength go into that SAR year.</p></div>
   <span class="pill {{ 'ok' if status.connected else 'warn' }}" style="font-size:13px">🔗 {{ status.label }}</span>
 </div>
 {% if status.mode == 'demo' %}<div class="card flat small" style="background:var(--warn-soft);border-color:#f3d9a6">
@@ -16,49 +16,78 @@
 {% if error %}
 <div class="card"><b>Not connected</b><p class="small muted" style="margin:6px 0 0">{{ error }}</p></div>
 {% else %}
+
+<h2 style="margin-top:8px">SAR years and what is in them</h2>
+<div class="table-wrap"><table class="small">
+  <tr><th>SAR year</th><th>Academic year</th><th>Filled from the ERP</th><th></th></tr>
+  {% for r in plan %}{% set d = done.get(r.slot) %}
+  <tr><td><b>{{ r.slot }}</b></td><td>{{ r.label }}</td>
+    <td>{% if d %}<span class="pill ok">ERP {{ d.ay_label }}</span> <span class="muted">{{ d.created_at[:16] }} UTC by {{ d.user_name }}</span>
+        {% if d.ay_label != r.label %}<span class="pill bad">year does not match</span>{% endif %}
+      {% else %}<span class="muted">not yet</span>{% endif %}</td>
+    <td style="text-align:right">{% if r.ok %}<a class="btn sm secondary" href="{{ url_for('faculty.erp_preview', program_id=p.id, ay=r.ay, slot=r.slot) }}">Preview {{ r.label }}</a>{% endif %}</td></tr>
+  {% endfor %}
+</table></div>
+<form method="post" style="margin:10px 0 18px">
+  <input type="hidden" name="_csrf" value="{{ csrf_token }}"><input type="hidden" name="all" value="1">
+  <button class="secondary" data-busy="Importing…" onclick="return confirm('Import every assessment year from the ERP, each into its own SAR year?')">⬇ Import all assessment years ({{ plan|selectattr('ok')|list|length }} years)</button>
+</form>
+
+<form method="get" class="card" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+  <div><label>ERP academic year</label>
+    <select name="ay" onchange="this.form.submit()">{% for a in available %}<option value="{{ a.start }}" {{ 'selected' if pv and a.start == pv.ay }}>{{ a.label }}</option>{% endfor %}</select></div>
+  <div style="font-size:22px;padding-bottom:8px">→</div>
+  <div><label>Put it in SAR year</label>
+    <select name="slot" onchange="this.form.submit()">{% for s in slots %}<option value="{{ s.name }}" {{ 'selected' if pv and s.name == pv.slot }}>{{ s.name }} ({{ s.label }})</option>{% endfor %}</select></div>
+  <noscript><button class="secondary">Show</button></noscript>
+</form>
+
+{% if pv %}
+{% if not pv.match %}<div class="flash error">You are putting ERP <b>{{ pv.ay_label }}</b> data into <b>{{ pv.slot }}</b>, which is <b>{{ pv.slot_label }}</b> in this SAR.
+  Check the years: NBA counts {{ pv.slot }} as {{ pv.slot_label }}.</div>
+{% else %}<div class="flash ok">ERP {{ pv.ay_label }} → {{ pv.slot }} ({{ pv.slot_label }}): the years match.</div>{% endif %}
+
 <div class="stats">
-  <div class="stat"><div class="v" style="color:var(--ok)">{{ diff.new|length }}</div><div class="k">new faculty in the ERP</div></div>
-  <div class="stat"><div class="v" style="color:var(--warn)">{{ diff.changed|length }}</div><div class="k">faculty with changed details</div></div>
-  <div class="stat"><div class="v">{{ diff.same }}</div><div class="k">already up to date</div></div>
-  <div class="stat"><div class="v">{{ diff.missing|length }}</div><div class="k">in the SAR list but not in the ERP</div></div>
+  <div class="stat"><div class="v">{{ pv.staff }}</div><div class="k">staff on the rolls in {{ pv.ay_label }} (ERP)</div></div>
+  <div class="stat"><div class="v" style="color:var(--ok)">{{ pv.diff.new|length }}</div><div class="k">not yet in the faculty list</div></div>
+  <div class="stat"><div class="v" style="color:var(--warn)">{{ pv.diff.changed|length }}</div><div class="k">with changed details</div></div>
+  <div class="stat"><div class="v">{{ pv.diff.same }}</div><div class="k">already up to date</div></div>
 </div>
+
+<h2>{{ pv.slot }} numbers: now and after the import</h2>
+<div class="table-wrap"><table class="small">
+  <tr><th>Number</th><th>In the SAR now ({{ pv.slot }})</th><th>From ERP {{ pv.ay_label }}</th></tr>
+  {% for r in pv.rows %}<tr><td>{{ r.label }}</td>
+    <td>{{ ('%g' % r.now) if r.now is not none else '–' }}</td>
+    <td><b style="{{ 'color:var(--warn)' if r.now is not none and r.now != r.erp }}">{{ '%g' % r.erp }}</b></td></tr>{% endfor %}
+</table></div>
+{% if pv.slot == 'CAYm3' %}<p class="small muted">CAYm3 is used by 5.4 (visiting faculty) only; its staff list is kept for the record.</p>{% endif %}
 
 <form method="post">
   <input type="hidden" name="_csrf" value="{{ csrf_token }}">
-  {% if diff.new %}
-  <h2>New faculty ({{ diff.new|length }})</h2>
+  <input type="hidden" name="ay" value="{{ pv.ay }}"><input type="hidden" name="slot" value="{{ pv.slot }}">
+  {% if pv.diff.new %}
+  <h2>Not yet in the faculty list ({{ pv.diff.new|length }})</h2>
   <div class="table-wrap"><table class="small">
-    <tr><th>Name</th><th>Department</th><th>Designation</th><th>Highest degree</th><th>Date of joining</th><th>Nature</th></tr>
-    {% for r in diff.new %}<tr><td><b>{{ r.name }}</b></td><td>{{ r.department }}{% if r.allied %} <span class="pill grey">allied</span>{% endif %}</td>
-      <td>{{ r.designation }}</td><td>{{ r.qualification }}</td><td>{{ r.joining_date }}</td><td>{{ r.nature }}</td></tr>{% endfor %}
+    <tr><th>Name</th><th>Department</th><th>Designation</th><th>Highest degree</th><th>Date of joining</th><th>Date of leaving</th></tr>
+    {% for r in pv.diff.new %}<tr><td><b>{{ r.name }}</b></td><td>{{ r.department }}{% if r.allied %} <span class="pill grey">allied</span>{% endif %}</td>
+      <td>{{ r.designation }}</td><td>{{ r.qualification }}</td><td>{{ r.joining_date }}</td><td>{{ r.leaving_date or '' }}</td></tr>{% endfor %}
   </table></div>
   {% endif %}
-  {% if diff.changed %}
-  <h2>Changed in the ERP ({{ diff.changed|length }})</h2>
+  {% if pv.diff.changed %}
+  <h2>Changed in the ERP ({{ pv.diff.changed|length }})</h2>
   <div class="table-wrap"><table class="small">
     <tr><th>Name</th><th>What changed</th></tr>
-    {% for c in diff.changed %}<tr><td><b>{{ c.row.name }}</b></td>
+    {% for c in pv.diff.changed %}<tr><td><b>{{ c.row.name }}</b></td>
       <td>{% for d in c.diffs %}<div>{{ d.field }}: <span class="muted" style="text-decoration:line-through">{{ d.old }}</span> → <b>{{ d.new }}</b></div>{% endfor %}</td></tr>{% endfor %}
   </table></div>
   {% endif %}
-  {% if students %}
-  <h2>Student strength (for 5.1 and 5.5)</h2>
-  <div class="table-wrap"><table class="small">
-    <tr><th>Number</th><th>Year</th><th>In the ERP</th><th>In the SAR now</th></tr>
-    {% for s in students %}<tr><td><b>{{ s.key }}</b> {{ 'students, Department + allied' if s.key == 'S' else 'students, Department alone' }}</td>
-      <td>{{ s.year }} ({{ s.label }})</td><td><b>{{ '%g' % s.erp }}</b></td>
-      <td>{% if s.now is none %}<span class="muted">empty</span>{% elif s.now != s.erp %}<span style="color:var(--warn)">{{ '%g' % s.now }}</span>{% else %}{{ '%g' % s.now }}{% endif %}</td></tr>{% endfor %}
-  </table></div>
-  <label class="small" style="margin-top:8px"><input type="checkbox" name="students" value="1" checked style="width:auto"> Also copy the student strength into the Numbers page</label>
-  {% endif %}
-  {% if diff.missing %}
-  <p class="small muted">{{ diff.missing|length }} people in the SAR list are not in the ERP ({{ diff.missing[:5]|map(attribute='name')|join(', ') }}{{ '…' if diff.missing|length > 5 }}). They are left as they are.</p>
-  {% endif %}
-  {% if diff.errors %}<div class="flash error">{{ diff.errors|length }} ERP records could not be read: {{ diff.errors[:3]|join('; ') }}</div>{% endif %}
-  <div class="form-actions">
-    <button class="accent lg" data-busy="Importing…">⬇ Import {{ diff.new|length + diff.changed|length }} faculty changes{{ ' and student strength' if students }}</button>
+  <label class="small" style="margin-top:12px"><input type="checkbox" name="students" value="1" checked style="width:auto"> Also copy the {{ pv.ay_label }} student strength (S, DS) into {{ pv.slot }}</label>
+  <div class="form-actions" style="position:static">
+    <button class="accent lg" data-busy="Importing…">⬇ Import ERP {{ pv.ay_label }} into {{ pv.slot }}</button>
     <a class="btn ghost" href="{{ url_for('faculty.list_faculty', program_id=p.id) }}">Cancel</a>
   </div>
 </form>
+{% endif %}
 {% endif %}
 {% endblock %}

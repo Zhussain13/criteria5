@@ -16,6 +16,10 @@ Counting rules (written down so the IQAC can check them; change the constants if
   as in NBA Annexure-I). FF = those with 100% first-year teaching load.
 - Retention counts department faculty only (RF = DS/20), full-time, PoP excluded.
 
+Year-wise ERP data: when a year's staff list has been imported from the ERP into a SAR year (table faculty_year),
+that list decides who counts in that year and with which designation, degree and first-year load. Years without an
+ERP import fall back to the date rules above.
+
 In "verified only" mode (what a strict peer team would accept) a person counts only when their
 appointment letter has been checked, and a Ph.D. / M.Tech counts only when the degree certificate
 has been checked; otherwise the Ph.D. holder is counted with no higher degree.
@@ -96,11 +100,25 @@ class Roster:
     """One program's faculty list, read year by year."""
 
     def __init__(self, faculty: list, years: AssessmentYears, proof_status: dict | None = None,
-                 verified_only: bool = False):
+                 verified_only: bool = False, snapshots: dict | None = None):
         self.faculty = [dict(f) for f in faculty]
         self.years = years
         self.status = proof_status or {}
         self.verified_only = verified_only
+        self.snap = snapshots or {}   # {SAR year: {faculty id: that year's ERP record}}
+
+    @classmethod
+    def from_db(cls, db, program, verified_only: bool = False, faculty=None):
+        from .faculty_proofs import proof_status
+
+        pid = program["id"]
+        if faculty is None:
+            faculty = db.execute("SELECT * FROM faculty WHERE program_id = ?", (pid,)).fetchall()
+        years = AssessmentYears(program["cay_start_year"], program["ay_start_month"])
+        return cls(faculty, years, proof_status(db, pid), verified_only, load_snapshots(db, pid))
+
+    def _s(self, f, y):
+        return self.snap[y].get(f["id"]) if y in self.snap else None
 
     # --- per person, per year ---------------------------------------------------------------
     def bounds(self, y: str) -> tuple[date, date]:
@@ -120,7 +138,10 @@ class Roster:
         return max(0, (e - s).days + 1)
 
     def present(self, f, y: str) -> bool:
-        if self.days_in(f, y) < MIN_DAYS_IN_YEAR:
+        if y in self.snap:
+            if f["id"] not in self.snap[y]:   # not in that year's ERP staff list
+                return False
+        elif self.days_in(f, y) < MIN_DAYS_IN_YEAR:
             return False
         if self.verified_only and self.status.get(f["id"], {}).get("appointment") != "verified":
             return False
@@ -128,6 +149,9 @@ class Roster:
 
     def designation_in(self, f, y: str) -> str:
         """Cadre in that year: the joining designation until the date of designation (promotion)."""
+        s = self._s(f, y)
+        if s and s.get("designation"):
+            return cadre_of(s["designation"])
         cur = cadre_of(_get(f, "designation"))
         on = _d(_get(f, "designated_on"))
         if on and on > self.mid(y) and _get(f, "designation_at_joining"):
@@ -135,8 +159,9 @@ class Roster:
         return cur
 
     def degree_in(self, f, y: str) -> str:
-        deg = degree_of(_get(f, "qualification"))
-        if deg == "phd":
+        s = self._s(f, y)
+        deg = degree_of(s["qualification"] if s and s.get("qualification") else _get(f, "qualification"))
+        if deg == "phd" and not s:
             got = _d(_get(f, "phd_date"))
             if got and got > self.mid(y):
                 deg = "mtech"  # the Ph.D. came later that year or after: counted with the master's degree
@@ -154,9 +179,14 @@ class Roster:
         return max(0, (end - j).days + 1) / 365.25
 
     # --- counts ------------------------------------------------------------------------------
+    def _attr(self, f, y, key, fn):
+        s = self._s(f, y)
+        return fn(s) if s is not None and s.get(key) is not None else fn(f)
+
     def teaching(self, y: str) -> list:
         """Full-time faculty in Department + allied, PoP excluded, present that year."""
-        return [f for f in self.faculty if self.present(f, y) and is_full_time(f) and not is_pop(f)]
+        return [f for f in self.faculty if self.present(f, y) and self._attr(f, y, "full_time", is_full_time)
+                and not self._attr(f, y, "nature", is_pop)]
 
     def metrics(self, students: dict | None = None) -> dict:
         """{(key, year): value} for every `auto: roster` field. `students` holds S for the PoP limit."""
@@ -164,16 +194,17 @@ class Roster:
         out = {}
         for y in YEARS:
             ft = self.teaching(y)
-            pops = [f for f in self.faculty if self.present(f, y) and is_full_time(f) and is_pop(f)]
+            pops = [f for f in self.faculty if self.present(f, y) and self._attr(f, y, "full_time", is_full_time)
+                    and self._attr(f, y, "nature", is_pop)]
             n_pop = len(pops)
             s = students.get(("S", y))
             if s:
                 n_pop = min(n_pop, int(0.2 * s / 20))  # NBA: PoP counted up to 20% of required faculty
             cad = [self.designation_in(f, y) for f in ft]
             deg = [self.degree_in(f, y) for f in ft]
-            dept = [f for f in ft if in_dept(f)]
+            dept = [f for f in ft if self._attr(f, y, "allied", in_dept)]
             out.update({
-                ("F", y): len(ft), ("POP", y): n_pop, ("FF", y): sum(1 for f in ft if _get(f, "first_year")),
+                ("F", y): len(ft), ("POP", y): n_pop, ("FF", y): sum(1 for f in ft if self._attr(f, y, "first_year", lambda r: _get(r, "first_year"))),
                 ("PHD", y): deg.count("phd"), ("MTECH", y): deg.count("mtech"),
                 ("AF1", y): cad.count(PROF), ("AF2", y): cad.count(ASSOC), ("AF3", y): cad.count(ASST),
                 ("AF", y): len(dept),
@@ -231,11 +262,19 @@ def merged_metrics(db, program, verified_only: bool = False) -> tuple[dict, dict
     typed = {(r["key"], r["year"]): r["value"] for r in db.execute(
         "SELECT key, year, value FROM metrics WHERE program_id = ?", (pid,))}
     faculty = db.execute("SELECT * FROM faculty WHERE program_id = ?", (pid,)).fetchall()
-    years = AssessmentYears(program["cay_start_year"], program["ay_start_month"])
     auto: dict = {}
     if faculty:
-        auto.update(Roster(faculty, years, proof_status(db, pid), verified_only).metrics(typed))
+        auto.update(Roster.from_db(db, program, verified_only, faculty).metrics(typed))
     claims = db.execute("SELECT item_code, tables_json FROM claims WHERE program_id = ? AND item_code = '5.4'",
                         (pid,)).fetchall()
     auto.update(adjunct_hours(claims))
     return {**typed, **auto}, auto
+
+
+def load_snapshots(db, program_id: int) -> dict:
+    """{SAR year: {faculty id: record}} for the years whose staff list came from the ERP."""
+    out: dict = {}
+    for r in db.execute("SELECT fy.* FROM faculty_year fy JOIN faculty f ON f.id = fy.faculty_id "
+                        "WHERE f.program_id = ?", (program_id,)):
+        out.setdefault(r["year"], {})[r["faculty_id"]] = dict(r)
+    return out

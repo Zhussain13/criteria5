@@ -14,7 +14,7 @@
 </div>
 
 <div class="stats">
-  {% for y in years %}<div class="stat"><div class="v">{{ counts[y.name] }}</div><div class="k">counted in {{ y.name }} ({{ y.label }})</div></div>{% endfor %}
+  {% for y in years %}<div class="stat"><div class="v">{{ counts[y.name] }}</div><div class="k">counted in {{ y.name }} ({{ y.label }}){% if y.erp %}<br><span class="pill ok">staff list from ERP {{ y.erp }}</span>{% endif %}</div></div>{% endfor %}
   {% set ver = st.values()|selectattr('appointment', 'equalto', 'verified')|list|length %}
   <div class="stat"><div class="v">{{ ver }}</div>
     <div class="k">appointment letters checked</div></div>
@@ -25,8 +25,8 @@
   <div style="font-size:30px">🔗</div>
   <div style="flex:1;min-width:240px">
     <b>ERP link (Juno Campus)</b> <span class="pill {{ 'ok' if erp.connected else 'warn' }}">{{ erp.label }}</span>
-    <div class="small muted" style="margin-top:4px">One click reads the faculty records and student strength from the ERP and fills them into
-      the Criterion 5 SAR tables. You see every change before it is saved.{% if last_erp %} Last import: {{ last_erp.created_at[:16] }} UTC by {{ last_erp.name }} ({{ last_erp.detail }}).{% endif %}</div>
+    <div class="small muted" style="margin-top:4px">Pick an ERP academic year (e.g. 2023-24) and the SAR year it goes into (CAYm2): that year's staff list and
+      student strength are filled into the Criterion 5 SAR tables. You see every change before it is saved.{% if last_erp %} Last import: {{ last_erp.created_at[:16] }} UTC by {{ last_erp.name }} ({{ last_erp.detail }}).{% endif %}</div>
   </div>
   {% if can_edit %}<a class="btn accent lg" href="{{ url_for('faculty.erp_preview', program_id=p.id) }}">⬇ Import from ERP</a>{% endif %}
 </div>

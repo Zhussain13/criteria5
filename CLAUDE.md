@@ -19,7 +19,8 @@ app/roster.py          counts per year from the faculty list; MIN_DAYS_IN_YEAR a
 app/faculty_proofs.py  proof checks and status; faculty_issues() for the report
 app/c5audit.py         build_report(): engine run, strict (verified-only) run, issues, pre-qualifiers, award conditions
 app/views/faculty.py   faculty list, edit, import (ALIASES = ERP column names), proof upload
-app/erp.py             ERP link: DemoERP (sample data) / DatabaseERP (to fill once CMRIT IT gives access); compare()
+app/erp.py             ERP link, year-wise: years(), year_data(); DemoERP (sample) / DatabaseERP (to fill); compare(),
+                       year_preview(), import_year() -> faculty_year + erp_imports + S/DS of that SAR year
 app/activity.py        activity log shown as "Recent updates" to head, HoD, principal
 app/demo.py            seed-demo
 ```

@@ -81,7 +81,10 @@ def build_report(db, program) -> dict:
     issues = faculty_issues(db, p, years)
     report["faculty_issues"] = issues
     st = proof_status(db, pid)
-    counted = [f for f in faculty if any(_present(f, years, y) for y in YEARS)]
+    from .roster import Roster
+
+    ros = Roster.from_db(db, p, faculty=faculty)
+    counted = [f for f in faculty if any(ros.present(f, y) for y in YEARS)]
     report["proof_summary"] = {
         "faculty_counted": len(counted),
         "appointment_verified": sum(1 for f in counted if st.get(f["id"], {}).get("appointment") == "verified"),
@@ -119,12 +122,6 @@ def build_report(db, program) -> dict:
     report["kind_label"] = "NBA formulas + proof checks (no AI)"
     report["ai_used"] = False
     return report
-
-
-def _present(f, years, y):
-    from .roster import Roster
-
-    return Roster([f], years).present(f, y)
 
 
 def _needs_degree(f) -> bool:
